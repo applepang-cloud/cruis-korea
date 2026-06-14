@@ -10,7 +10,7 @@ try {
   while ($listener.IsListening) {
     $ctx = $listener.GetContext()
     $path = [System.Uri]::UnescapeDataString($ctx.Request.Url.AbsolutePath)
-    if ($path -eq "/" -or $path -eq "") { $path = "/cruisn-korea-v13.html" }
+    if ($path -eq "/" -or $path -eq "") { $path = "/cruisn-korea-v15.html" }
     $file = Join-Path $root ($path.TrimStart("/"))
     if (Test-Path $file -PathType Leaf) {
       $bytes = [System.IO.File]::ReadAllBytes($file)
