@@ -148,7 +148,7 @@
   <div id="hud-speed" class="hud-txt"><span class="num" id="spd">0</span> <span class="unit">km/h</span></div>
   <div id="hud-time"><div class="lbl hud-txt">TIME</div><div class="num hud-txt" id="time">60</div></div>
   <div id="hud-rank"><div class="big hud-txt" id="rank">8th</div><div class="small hud-txt" id="dist">0 m</div></div>
-  <div id="hud-lap" class="hud-txt"><span id="lap">1</span><span style="font-size:.55em">/3 LAP</span></div>
+  <div id="hud-lap" class="hud-txt"><span id="lap">1</span><span style="font-size:.55em">/<span id="laptot">3</span> LAP</span></div>
   <div id="hud-course" class="hud-txt">COURSE 1</div>
   <div id="hud-prog"><i id="progbar"></i></div>
   <div id="hud-msg" class="hud-txt"></div>
@@ -635,11 +635,16 @@ function aircraftSound(type){
     f.type='lowpass'; f.frequency.value=420; o.type='sawtooth'; o.frequency.setValueAtTime(130,AC.currentTime); o.frequency.linearRampToValueAtTime(78,AC.currentTime+0.9);
     g.gain.setValueAtTime(.0001,AC.currentTime); g.gain.linearRampToValueAtTime(.22,AC.currentTime+0.2); g.gain.exponentialRampToValueAtTime(.001,AC.currentTime+1.0);
     o.connect(f);f.connect(g);g.connect(AC.destination);o.start();o.stop(AC.currentTime+1.1); } }
+function dinoRoar(){ if(!AC||muted)return; const o=AC.createOscillator(),g=AC.createGain(),f=AC.createBiquadFilter();
+  f.type='lowpass'; f.frequency.value=700; o.type='sawtooth';
+  o.frequency.setValueAtTime(120,AC.currentTime); o.frequency.linearRampToValueAtTime(60,AC.currentTime+0.5); o.frequency.linearRampToValueAtTime(48,AC.currentTime+1.3);
+  g.gain.setValueAtTime(.0001,AC.currentTime); g.gain.linearRampToValueAtTime(.42,AC.currentTime+.12); g.gain.exponentialRampToValueAtTime(.001,AC.currentTime+1.4);
+  o.connect(f);f.connect(g);g.connect(AC.destination); o.start(); o.stop(AC.currentTime+1.5); }
 const dino=makeDino(); dino.visible=false; scene.add(dino);
 const dinoState={active:false, t:0, next:7+Math.random()*7, s:0, lat:0, cross:0};
 
 // ====== 기찻길 + 기차 (도로 왼쪽 바깥 평행 선로) ======
-const RAIL_LAT = -(ROAD_W/2 + 30);
+const RAIL_LAT = -(ROAD_W/2 + 7);   // 도로 왼쪽 갓길 바로 옆 (충돌 가능)
 function railStrip(halfW, off, color, yoff){
   const g=new T.BufferGeometry(), v=[], idx=[];
   for(let i=0;i<pts.length;i++){ const p=pts[i], cx=Math.cos(p.h), cz=Math.sin(p.h), gy=groundY(p,off)+yoff;
@@ -1147,12 +1152,25 @@ const girlState={active:false, t:0, phase:'idle'}; // idle→wave→exit
 // 초기 씨너리 (타이틀 데모 배경)
 buildScenery();
 
+// 순위 숫자 (차 위에 떠 있는 스프라이트)
+const _rankTex={};
+function rankTexture(n){ if(_rankTex[n]) return _rankTex[n];
+  const cv=document.createElement('canvas'); cv.width=cv.height=64; const c=cv.getContext('2d');
+  c.font='900 46px "Arial Black",Arial'; c.textAlign='center'; c.textBaseline='middle';
+  c.lineWidth=7; c.strokeStyle='#000'; c.strokeText(n,32,35);
+  c.fillStyle=(n===1)?'#ffd722':'#ffffff'; c.fillText(n,32,35);
+  const t=new T.CanvasTexture(cv); _rankTex[n]=t; return t; }
+function makeRankSprite(){ const s=new T.Sprite(new T.SpriteMaterial({map:rankTexture(8),depthTest:false}));
+  s.scale.set(2,2,1); s.position.set(0,3.6,0); s.renderOrder=6; return s; }
+
 // 플레이어 (기본 = La Bomba, SELECT CAR에서 변경 가능)
 let player = buildCarMesh(CARS[0]);
 scene.add(player);
+player.userData.rankSprite=makeRankSprite(); player.add(player.userData.rankSprite);
 function setPlayerCar(spec){
   if(player) scene.remove(player);
   player = buildCarMesh(spec);
+  player.userData.rankSprite=makeRankSprite(); player.add(player.userData.rankSprite);
   scene.add(player);
 }
 // 무적 불꽃 이펙트
@@ -1168,9 +1186,10 @@ const rivals = RIVAL_COLORS.map((c,i)=>({
   base: 49 + i*0.5 + Math.random()*1.5, // m/s — 주인공과 동일 속도
   wob: Math.random()*6.28, lap:1, driver:i, itemT:5+Math.random()*5   // itemT: 아이템 공격 타이머
 }));
+rivals.forEach(r=>{ const sp=makeRankSprite(); r.mesh.userData.rankSprite=sp; r.mesh.add(sp); });
 
 // 일반 트래픽 (느린 차들 — 원작 시그니처)
-const TRAFFIC_COLORS=[0xcfd4dc,0x8899aa,0x4f6b8f,0xc9a14a,0x6b4fa0,0x9fb86a];
+const TRAFFIC_COLORS=[0x3a3a3e,0x55585e,0x6e7176,0x2a2a2e,0x86898f,0x44464a,0x1c1c20];
 const traffic=[];
 for(let s=260; s<TRACK_LEN-500; s+=95+Math.random()*90){
   // 우측(중앙선 오른쪽)=전진, 좌측=역주행으로 다가옴 — 중앙선 안 넘음
@@ -1268,11 +1287,11 @@ function hitPlayer(){            // 라이벌 아이템에 맞음 → 스핀(전
 // ---------- 코스 캠페인 ----------
 // time=시작 제한시간, ck=체크포인트 보너스(구간 소요≈26~30s 기준), lap=랩 보너스
 const COURSES=[
-  {map:'suburb', name:'COURSE 1 · SUNNY SUBURB', diff:1.00, time:52, ck:44, lap:12},
-  {map:'city',   name:'COURSE 2 · NEON CITY',    diff:1.08, time:48, ck:40, lap:10},
-  {map:'beach',  name:'COURSE 3 · STORMY BEACH', diff:1.16, time:44, ck:36, lap:8},
+  {map:'suburb', name:'COURSE 1 · SUNNY SUBURB', diff:1.00, time:32, ck:44, lap:12, laps:2},
+  {map:'city',   name:'COURSE 2 · NEON CITY',    diff:1.08, time:28, ck:40, lap:10, laps:2},
+  {map:'beach',  name:'COURSE 3 · STORMY BEACH', diff:1.16, time:24, ck:36, lap:8,  laps:3},
 ];
-const TOTAL_LAPS=3;
+let TOTAL_LAPS=3;   // 코스 시작 시 COURSES[c].laps로 설정
 let unlockedCourse=1;          // 클리어로 해금된 최고 코스 (게임오버해도 유지)
 let resultMode='retry';        // advance | retry | champion
 
@@ -1297,7 +1316,7 @@ const G={
   replayT:0, replayShot:0,// 리플레이
 };
 const CAR_DRIVER={bomba:0, thunder:1, viper:3, bull:5}; // 차→드라이버 얼굴 인덱스
-const MAXSPD = 50;       // m/s — 주인공 30% 추가 하향(≈180km/h)
+const MAXSPD = 60;       // m/s — 주인공 +20%(≈216km/h)
 const ROLL_SPD = 55.5;   // 200km/h 이상에서만 전복(롤아웃)
 // 총 진행거리(랩 포함) — 순위 판정용
 const LAP_LEN = ()=>FINISH_S;
@@ -1355,7 +1374,7 @@ function audioInit(){
   eng={oscs,filter:flt,noiseGain,master,nflt};
 }
 // 엔진 RPM 모델: 기어가 있어 속도가 오르면 RPM이 차오르다 변속 시 뚝 떨어짐
-const GEARS=[0,9,16,24,33,42,50]; // 각 기어 상단 속도(m/s)
+const GEARS=[0,11,20,30,42,52,60]; // 각 기어 상단 속도(m/s)
 let lastGear=0;
 function updateEngine(spd, throttle){
   if(!eng||muted){ if(eng)eng.master.gain.value=0; return; }
@@ -1682,6 +1701,7 @@ function openSelect(){
 }
 function updateLapHud(){
   const lp=$('lap'); if(lp) lp.textContent=G.lap;
+  const lt=$('laptot'); if(lt) lt.textContent=TOTAL_LAPS;
   const cs=$('hud-course'); if(cs) cs.textContent='COURSE '+G.course+'/3';
 }
 function startCourse(courseNum){
@@ -1689,7 +1709,7 @@ function startCourse(courseNum){
   warmTTS();
   G.course=Math.max(1,Math.min(3,courseNum));
   const co=COURSES[G.course-1];
-  G.diff=co.diff;
+  G.diff=co.diff; TOTAL_LAPS=co.laps;
   THEME=THEMES[co.map]; buildScenery();
   G.mode='countdown'; G.s=0; G.lat=0; G.spd=0; G.time=co.time; G.nextCk=0; G.lap=1; G.introCam=0;
   G.countdown=4.4; G.tauntT=6;
@@ -2133,6 +2153,16 @@ function loop(now){
         flashScreen('#caa15a',.3); beep(90,.3,'sawtooth',.3); msg('BUILDING DOWN!','#ff7744'); thunderSound(); playerSay('shock'); break;
       }
     }}
+    // 대형 오브젝트(공룡·항공기·기차) 충돌 → 3바퀴 전복
+    if(!invinc && !disabled && G.crashT<=0){
+      const ps=sample(G.s), pwx=ps.x+Math.cos(ps.h)*G.lat, pwz=ps.z+Math.sin(ps.h)*G.lat;
+      let big=false;
+      if(dinoState.active){ const dl=dinoState.lat+(dinoState.lat>0?-1:1)*dinoState.cross;
+        if(Math.abs(dinoState.s-G.s)<6 && Math.abs(dl-G.lat)<4.5) big=true; }
+      if(!big) for(const a of aircraft){ if(Math.abs(a.mesh.position.x-pwx)<4 && Math.abs(a.mesh.position.z-pwz)<4){ big=true; break; } }
+      if(!big) for(const c of trainCars){ if(Math.abs(c.position.x-pwx)<4.5 && Math.abs(c.position.z-pwz)<4.5){ big=true; break; } }
+      if(big){ startRollout(); }
+    }
 
     // --- 라이벌 AI (스핀아웃 / 번개 축소 반영) ---
     for(const r of rivals){
@@ -2286,6 +2316,13 @@ function loop(now){
     const skidding = racing && G.spd>22 && (Math.abs(G.steer)>0.6 || offRoad);
     skidSound(skidding);
 
+    // --- 순위 숫자 갱신 (플레이어 + 라이벌 8대) ---
+    { const order=[{p:1,t:playerTotal()}];
+      for(let i=0;i<rivals.length;i++) order.push({p:0,r:rivals[i],t:rivalTotal(rivals[i])});
+      order.sort((a,b)=>b.t-a.t);
+      for(let i=0;i<order.length;i++){ const sp=order[i].p? player.userData.rankSprite : order[i].r.mesh.userData.rankSprite;
+        if(sp) sp.material.map=rankTexture(i+1); } }
+
     // --- HUD ---
     ui.spd.textContent = Math.round(G.spd*3.6);
     ui.time.textContent = Math.ceil(G.time);
@@ -2337,7 +2374,7 @@ function loop(now){
     dinoState.t+=dt;
     if(!dinoState.active && dinoState.t>dinoState.next){ dinoState.active=true; dinoState.t=0; dinoState.cross=0;
       dino.visible=true; dinoState.s=(G.mode==='race'?G.s:200)+120;        // 앞쪽 도로
-      dinoState.lat=(Math.random()<.5?-1:1)*(ROAD_W/2+16); }               // 한쪽 갓길에서 시작
+      dinoState.lat=(Math.random()<.5?-1:1)*(ROAD_W/2+16); dinoRoar(); }   // 한쪽 갓길에서 시작 + 울음
     if(dinoState.active){
       dinoState.cross += dt*9;                                              // 도로를 가로질러 걷기
       const dir=dinoState.lat>0?-1:1, dl=dinoState.lat + dir*dinoState.cross;
