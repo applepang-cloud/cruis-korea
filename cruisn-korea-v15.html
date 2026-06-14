@@ -21,6 +21,7 @@
   #game{position:fixed;inset:0}
   canvas{display:block}
   /* 화면 플래시 / 큰 아이콘 연출 */
+  #dark{position:fixed;inset:0;z-index:17;pointer-events:none;opacity:0;background:#050510}
   #flash{position:fixed;inset:0;z-index:18;pointer-events:none;opacity:0;background:#fff;mix-blend-mode:screen}
   #flash.rainbow{background:linear-gradient(120deg,#ff0055,#ffd200,#00e1ff,#a64dff,#ff0055);background-size:300% 300%;animation:rbshift .6s linear infinite}
   @keyframes rbshift{0%{background-position:0% 50%}100%{background-position:300% 50%}}
@@ -130,6 +131,7 @@
 </head>
 <body>
 <div id="game"></div>
+<div id="dark"></div>
 <div id="flash"></div>
 <div id="bigicon"></div>
 <div id="ver" style="position:fixed;bottom:4px;right:6px;z-index:40;color:#ffffff66;font:700 10px monospace;pointer-events:none">v15</div>
@@ -542,10 +544,72 @@ function streetlight(){
   lamp.position.set(0,7,0); g.add(lamp);
   return g;
 }
+// 활엽수
+function tree(){
+  const g=new T.Group();
+  g.add(new T.Mesh(new T.CylinderGeometry(.3,.45,4.5,7),trunkMat).translateY(2.25));
+  const fMat=new T.MeshLambertMaterial({color:new T.Color().setHSL(.28,.5,.28+Math.random()*.12)});
+  for(let i=0;i<3;i++){ const b=new T.Mesh(new T.SphereGeometry(1.6+Math.random()*0.8,8,6),fMat);
+    b.position.set((Math.random()-.5)*1.2, 4.4+i*0.8, (Math.random()-.5)*1.2); g.add(b); }
+  return g;
+}
+// 사람 (걷기 애니메이션용 다리/팔 핸들)
+function makePerson(){
+  const g=new T.Group();
+  const skin=new T.MeshLambertMaterial({color:0xe8b88f});
+  const shirt=new T.MeshLambertMaterial({color:new T.Color().setHSL(Math.random(),.55,.5)});
+  const pants=new T.MeshLambertMaterial({color:new T.Color().setHSL(Math.random(),.3,.28)});
+  const parts={};
+  for(const sx of [-1,1]){ const leg=new T.Group(); const lm=new T.Mesh(new T.BoxGeometry(.18,.8,.2),pants); lm.position.y=-.4; leg.add(lm); leg.position.set(sx*.13,.8,0); g.add(leg); parts['leg'+sx]=leg; }
+  g.add(new T.Mesh(new T.BoxGeometry(.5,.7,.28),shirt).translateY(1.15));
+  for(const sx of [-1,1]){ const arm=new T.Group(); const am=new T.Mesh(new T.BoxGeometry(.13,.6,.16),shirt); am.position.y=-.3; arm.add(am); arm.position.set(sx*.34,1.45,0); g.add(arm); parts['arm'+sx]=arm; }
+  g.add(new T.Mesh(new T.SphereGeometry(.2,10,8),skin).translateY(1.72));
+  const hair=new T.Mesh(new T.SphereGeometry(.21,10,8),new T.MeshLambertMaterial({color:0x2a1a10})); hair.scale.set(1,.7,1); hair.position.y=1.8; g.add(hair);
+  g.userData.parts=parts;
+  return g;
+}
+// 비행기 / 헬기
+function makePlane(){
+  const g=new T.Group(); const body=new T.MeshLambertMaterial({color:0xe8edf2});
+  const fus=new T.Mesh(new T.CylinderGeometry(1.2,1.2,12,10),body); fus.rotation.z=Math.PI/2; g.add(fus);
+  const nose=new T.Mesh(new T.ConeGeometry(1.2,3,10),body); nose.rotation.z=-Math.PI/2; nose.position.x=7.5; g.add(nose);
+  g.add(new T.Mesh(new T.BoxGeometry(2.4,.4,16),new T.MeshLambertMaterial({color:0xccd2da})));
+  const tail=new T.Mesh(new T.BoxGeometry(1.4,.3,5),new T.MeshLambertMaterial({color:0xccd2da})); tail.position.x=-5.5; g.add(tail);
+  const fin=new T.Mesh(new T.BoxGeometry(1.4,2.4,.3),new T.MeshLambertMaterial({color:0xe23a3a})); fin.position.set(-5.5,1.2,0); g.add(fin);
+  g.scale.setScalar(1.6); return g;
+}
+function makeHelicopter(){
+  const g=new T.Group(); const dark=new T.MeshLambertMaterial({color:0x33414e}), blade=new T.MeshLambertMaterial({color:0x222226});
+  const body=new T.Mesh(new T.SphereGeometry(2,10,8),dark); body.scale.set(1.6,1,1); g.add(body);
+  const boom=new T.Mesh(new T.CylinderGeometry(.4,.25,7,8),dark); boom.rotation.z=Math.PI/2; boom.position.x=-4.5; g.add(boom);
+  const rotor=new T.Mesh(new T.BoxGeometry(14,.15,.8),blade); rotor.position.y=2.2; g.add(rotor);
+  const tailRotor=new T.Mesh(new T.BoxGeometry(.1,2.4,.4),blade); tailRotor.position.set(-7.6,.6,0); g.add(tailRotor);
+  g.userData.rotor=rotor; g.userData.tailRotor=tailRotor; g.scale.setScalar(1.4); return g;
+}
+// 공룡 (브라키오사우루스풍)
+function makeDino(){
+  const g=new T.Group(); const green=new T.MeshLambertMaterial({color:0x4f7a3e});
+  const body=new T.Mesh(new T.SphereGeometry(3,12,9),green); body.scale.set(1.7,1.1,1); body.position.y=5; g.add(body);
+  for(let i=0;i<6;i++){ const n=new T.Mesh(new T.SphereGeometry(1.1-i*0.12,8,6),green); n.position.set(3.5+i*1.1,5.5+i*1.1,0); g.add(n); }
+  const head=new T.Mesh(new T.BoxGeometry(1.6,1.1,1.1),green); head.position.set(9.6,11.6,0); g.add(head);
+  for(let i=0;i<6;i++){ const tl=new T.Mesh(new T.SphereGeometry(1.0-i*0.13,8,6),green); tl.position.set(-3.5-i*1.2,4.4-i*0.4,0); g.add(tl); }
+  for(const lp of [[2.2,1.7],[2.2,-1.7],[-2.2,1.7],[-2.2,-1.7]]){ const leg=new T.Mesh(new T.CylinderGeometry(.7,.55,5,7),green); leg.position.set(lp[0],2.5,lp[1]); g.add(leg); }
+  return g;
+}
+
+// 애니메이션 엔티티 (항상 존재)
+const pedestrians=[];
+const aircraft=[];
+{ const p1=makePlane(); scene.add(p1); aircraft.push({mesh:p1,type:'plane',x:-1000,y:155,zoff:-300,spd:75});
+  const p2=makePlane(); scene.add(p2); aircraft.push({mesh:p2,type:'plane',x:500,y:195,zoff:240,spd:60});
+  const h1=makeHelicopter(); scene.add(h1); aircraft.push({mesh:h1,type:'heli',x:-300,y:95,zoff:-130,spd:38}); }
+const dino=makeDino(); dino.visible=false; scene.add(dino);
+const dinoState={active:false, t:0, next:7+Math.random()*7, s:0, lat:0, cross:0};
 
 // 해변: 모래·바다 평면, 파라솔
 function buildScenery(){
   clearScenery();
+  pedestrians.length=0;
   const th=THEME;
   // 하늘/안개/조명
   scene.background=new T.Color(th.sky);
@@ -593,15 +657,20 @@ function buildScenery(){
 
   // 도로변 오브젝트 루프
   if(th.scene==='suburb'){
-    for(let s=160; s<TRACK_LEN-400; s+=110+Math.random()*120){
+    for(let s=160; s<TRACK_LEN-400; s+=62+Math.random()*60){
       const side=Math.random()<.5?-1:1, lat=side*(ROAD_W/2+9+Math.random()*7);
       const hs=house(); const p=place(hs,s,lat);
       hs.position.y=groundY(p,lat)-.25; hs.rotation.x=0;
       hs.rotation.y=-p.h+(lat>0?Math.PI/2:-Math.PI/2); addS(hs);
     }
+    // 활엽수도 추가
+    for(let s=120; s<TRACK_LEN-200; s+=40){
+      if(Math.random()<.6){ const side=Math.random()<.5?-1:1, lat=side*(ROAD_W/2+5+Math.random()*16);
+        const tr=tree(); const p=place(tr,s,lat); tr.position.y=groundY(p,lat); tr.rotation.x=0; tr.rotation.y=Math.random()*6.3; addS(tr); }
+    }
   }
   if(th.scene==='city'){
-    for(let s=120; s<TRACK_LEN-300; s+=55+Math.random()*55){
+    for(let s=120; s<TRACK_LEN-300; s+=38+Math.random()*34){
       const side=Math.random()<.5?-1:1, lat=side*(ROAD_W/2+11+Math.random()*22);
       const b=building(); const p=place(b,s,lat);
       b.position.y=groundY(p,lat)-1; b.rotation.x=0;
@@ -615,8 +684,8 @@ function buildScenery(){
     }
   }
   if(th.palms){
-    const dens=th.scene==='beach'?.6:.45;
-    for(let s=60;s<TRACK_LEN-100;s+=46){
+    const dens=th.scene==='beach'?.72:.6;
+    for(let s=60;s<TRACK_LEN-100;s+=32){
       if(Math.random()<dens){
         const side=Math.random()<.5?-1:1, lat=side*(ROAD_W/2+4+Math.random()*10);
         const tr=palm(); const p=place(tr,s,lat);
@@ -632,6 +701,16 @@ function buildScenery(){
       g.add(board,new T.Mesh(new T.CylinderGeometry(.12,.12,5.4,5),new T.MeshLambertMaterial({color:0x999999})).translateY(2.7));
       const lat2=(Math.random()<.5?-1:1)*(ROAD_W/2+3); const p2=place(g,s+20,lat2);
       g.position.y=groundY(p2,lat2); g.rotation.x=0; addS(g);
+    }
+  }
+  // 사람들 (서 있기 / 걷기) — 건물·나무 근처 도로변
+  for(let s=140; s<TRACK_LEN-200; s+=72+Math.random()*70){
+    if(Math.random()<.75){
+      const side=Math.random()<.5?-1:1, lat=side*(ROAD_W/2+4+Math.random()*11);
+      const pr=makePerson(); const walk=Math.random()<.5;
+      const p=place(pr,s,lat); pr.position.y=groundY(p,lat); pr.rotation.x=0;
+      pr.rotation.y=-p.h+(walk?0:(side>0?Math.PI/2:-Math.PI/2));
+      addS(pr); pedestrians.push({mesh:pr,s,lat,walk,phase:Math.random()*6.28,dir:Math.random()<.5?1:-1});
     }
   }
 }
@@ -831,6 +910,7 @@ function buildCarMesh(spec){
   const W=D.bodyW, L=D.bodyL, bodyY=D.bodyY, bodyH=D.bodyH, cabH=D.cabH, cabZ=D.cabZ, cabL=D.cabL;
   // 곡면 차체
   const body=new T.Mesh(bodyGeoFor(type),bodyMat); g.add(body);
+  g.userData.bodyMat=bodyMat;          // 무적 무지개 연출용
   // 글래스 캐노피 (윈드실드+사이드+리어)
   const cab=new T.Mesh(new T.BoxGeometry(W*0.84, cabH*0.9, cabL*0.92),GLASS_MAT);
   cab.position.set(0, bodyY+bodyH/2+cabH*0.45, cabZ); g.add(cab);
@@ -989,6 +1069,10 @@ function setPlayerCar(spec){
   player = buildCarMesh(spec);
   scene.add(player);
 }
+// 무적 불꽃 이펙트
+const starFx=new T.Group();
+for(let i=0;i<8;i++){ starFx.add(new T.Mesh(new T.ConeGeometry(0.25,0.9,6), new T.MeshBasicMaterial({color:0xffaa22}))); }
+starFx.visible=false; scene.add(starFx);
 
 // 라이벌 7대
 const RIVAL_COLORS=[0x2b46e0,0xf2c50f,0x18a85a,0xd96bd0,0xff7a1a,0x35c9d8,0x8e44ad];
@@ -1069,20 +1153,31 @@ function spawnBanana(s,lat){
   bananas.push({s,lat,mesh:m});
   while(bananas.length>14){ const b=bananas.shift(); scene.remove(b.mesh); }
 }
-const _misGeo=new T.ConeGeometry(0.28,1.1,8), _misMat=new T.MeshBasicMaterial({color:0xff5522});
 const projectiles=[];
+const _misBody=new T.MeshLambertMaterial({color:0xdfe3ea}), _misRed=new T.MeshLambertMaterial({color:0xe23030}),
+      _misFlame=new T.MeshBasicMaterial({color:0xffae22});
+function makeMissile(){
+  const g=new T.Group();
+  const body=new T.Mesh(new T.CylinderGeometry(0.18,0.18,1.0,10),_misBody); body.rotation.x=Math.PI/2; g.add(body);
+  const nose=new T.Mesh(new T.ConeGeometry(0.18,0.5,10),_misRed); nose.rotation.x=-Math.PI/2; nose.position.z=-0.75; g.add(nose);
+  for(let i=0;i<3;i++){ const a=i*Math.PI*2/3; const fin=new T.Mesh(new T.BoxGeometry(0.05,0.28,0.3),_misRed);
+    fin.position.set(Math.cos(a)*0.18, Math.sin(a)*0.18, 0.42); fin.rotation.z=a; g.add(fin); }
+  const flame=new T.Mesh(new T.ConeGeometry(0.16,0.8,8),_misFlame); flame.rotation.x=Math.PI/2; flame.position.z=0.9; g.add(flame);
+  g.userData.flame=flame;
+  return g;
+}
 function spawnMissile(s,lat,homing,target){
-  const m=new T.Mesh(_misGeo,_misMat); m.rotation.x=Math.PI/2; scene.add(m);
-  projectiles.push({s,lat,spd:175,homing:!!homing,target:target||null,mesh:m,dist:0});
+  const m=makeMissile(); scene.add(m);
+  projectiles.push({s,lat,spd:150,homing:!!homing,target:target||null,mesh:m,dist:0,t:0});
 }
 function hitRival(r){ r.spin=Math.max(r.spin||0,2.2); r.spd=0; }
 
 // ---------- 코스 캠페인 ----------
 // time=시작 제한시간, ck=체크포인트 보너스(구간 소요≈26~30s 기준), lap=랩 보너스
 const COURSES=[
-  {map:'suburb', name:'COURSE 1 · SUNNY SUBURB', diff:1.00, time:34, ck:26, lap:9},
-  {map:'city',   name:'COURSE 2 · NEON CITY',    diff:1.10, time:29, ck:23, lap:7},
-  {map:'beach',  name:'COURSE 3 · STORMY BEACH', diff:1.20, time:25, ck:21, lap:6},
+  {map:'suburb', name:'COURSE 1 · SUNNY SUBURB', diff:1.00, time:44, ck:26, lap:9},
+  {map:'city',   name:'COURSE 2 · NEON CITY',    diff:1.10, time:39, ck:23, lap:7},
+  {map:'beach',  name:'COURSE 3 · STORMY BEACH', diff:1.20, time:35, ck:21, lap:6},
 ];
 const TOTAL_LAPS=3;
 let unlockedCourse=1;          // 클리어로 해금된 최고 코스 (게임오버해도 유지)
@@ -1600,6 +1695,14 @@ function flashRainbow(dur){ const f=$('flash'); if(!f)return; f.classList.add('r
   f.style.transition='opacity '+(dur||1)+'s ease-out'; f.style.opacity='0';
   setTimeout(function(){ f.classList.remove('rainbow'); }, (dur||1)*1000); }
 function bigIcon(txt){ const b=$('bigicon'); if(!b)return; b.textContent=txt; b.classList.remove('pop'); void b.offsetWidth; b.classList.add('pop'); }
+function lightningEffect(){           // 화면 전체 암전 → 번쩍번쩍
+  const d=$('dark'); if(d){ d.style.transition='none'; d.style.opacity='0.82'; void d.offsetWidth; }
+  setTimeout(function(){ flashScreen('#ffffff',.12); },90);
+  setTimeout(function(){ flashScreen('#d6ecff',.12); },280);
+  setTimeout(function(){ flashScreen('#ffffff',.1); },430);
+  if(d){ setTimeout(function(){ d.style.transition='opacity .8s'; d.style.opacity='0'; },520); }
+  thunderSound();
+}
 function whoosh(){ if(!AC||muted)return; const o=AC.createOscillator(),g=AC.createGain();
   o.type='sawtooth'; o.frequency.setValueAtTime(900,AC.currentTime); o.frequency.exponentialRampToValueAtTime(160,AC.currentTime+0.4);
   g.gain.setValueAtTime(.22,AC.currentTime); g.gain.exponentialRampToValueAtTime(.001,AC.currentTime+0.45);
@@ -1612,7 +1715,7 @@ function thunderSound(){ if(!AC||muted)return; const o=AC.createOscillator(),g=A
 function startRollout(){
   G.rollT=G.rollDur=1.8; G.spd*=0.3; G.crashT=2.0; G.shakeT=.9;
   msg('CRASH! 💥','#ff3322'); beep(80,.5,'sawtooth',.45); thunderSound(); flashScreen('#ff2a1a',.45);
-  playerSay('shock'); say('크게 부딪혔습니다! 차가 세 바퀴 구릅니다!',true);
+  playerSay('shock'); say('크게 부딪혔습니다!',true);
 }
 
 // ====== 얼굴 HUD + 다중 음성 TTS ======
@@ -1695,7 +1798,7 @@ function useItem(slot){
   else if(k==='missiles'){ for(const off of [-2.4,0,2.4]) spawnMissile(G.s+6,G.lat+off,false,null);
     whoosh(); setTimeout(whoosh,90); setTimeout(whoosh,180); bigIcon('🚀'); flashScreen('#ff8844',.22); }
   else if(k==='lightning'){ for(const r of rivals) r.shrink=5; msg('⚡ LIGHTNING!','#7df1ff');
-    thunderSound(); flashScreen('#ffffff',.5); bigIcon('⚡'); rivalSay(rivals[Math.floor(Math.random()*rivals.length)],'shock'); }
+    lightningEffect(); bigIcon('⚡'); rivalSay(rivals[Math.floor(Math.random()*rivals.length)],'shock'); }
   else if(k==='star'){ G.star=10; msg('⭐ INVINCIBLE!','#ffd722');
     jingle([523,659,784,1047,1319]); flashRainbow(1.1); bigIcon('⭐'); playerSay('happy'); }
 }
@@ -1723,8 +1826,10 @@ function updateItemWorld(dt){
   }
   for(let i=projectiles.length-1;i>=0;i--){ const p=projectiles[i];
     if(p.homing&&p.target&&(p.target.spin||0)<=0){ p.lat+=Math.max(-7*dt,Math.min(7*dt,p.target.lat-p.lat)); }
-    p.s+=p.spd*dt; p.dist+=p.spd*dt;
-    const pp=sample(p.s); p.mesh.position.set(pp.x+Math.cos(pp.h)*p.lat, pp.y+1.0, pp.z+Math.sin(pp.h)*p.lat);
+    p.s+=p.spd*dt; p.dist+=p.spd*dt; p.t=(p.t||0)+dt;
+    const pp=sample(p.s); p.mesh.position.set(pp.x+Math.cos(pp.h)*p.lat, pp.y+1.2, pp.z+Math.sin(pp.h)*p.lat);
+    p.mesh.rotation.y=-pp.h;                              // 진행 방향으로 정렬
+    if(p.mesh.userData.flame) p.mesh.userData.flame.scale.set(1,0.7+Math.random()*0.6,1);  // 화염 깜빡
     let hit=false;
     for(const r of rivals){ if((r.spin||0)<=0 && Math.abs(r.s-p.s)<4 && Math.abs(r.lat-p.lat)<2.4){ hitRival(r); rivalSay(r,'itemHit'); hit=true; break; } }
     if(hit||p.dist>320){ scene.remove(p.mesh); projectiles.splice(i,1); }
@@ -1918,6 +2023,16 @@ function loop(now){
     player.scale.setScalar(invinc? 1+0.06*Math.sin(now*.02):1);  // 무적 펄스
     if(rolling){ const prog=1-Math.max(0,G.rollT)/G.rollDur;     // 3바퀴 구르기
       player.rotation.z = prog*Math.PI*6; player.position.y += Math.sin(prog*Math.PI)*1.3; }
+    // 무적: 차체 무지개 + 불꽃
+    if(player.userData.bodyMat){
+      if(invinc) player.userData.bodyMat.color.setHSL((now*0.0006)%1,1,0.55);
+      else player.userData.bodyMat.color.setHex(G.car.color);
+    }
+    if(invinc){ starFx.visible=true; starFx.position.copy(player.position);
+      for(let i=0;i<starFx.children.length;i++){ const f=starFx.children[i], a=now*0.012+i*0.8;
+        f.position.set(Math.cos(a)*1.2, 0.4+Math.abs(Math.sin(a*1.3))*0.9, Math.sin(a)*1.6+0.4);
+        f.scale.setScalar(0.5+Math.random()*0.9); f.material.color.setHSL(0.05+Math.random()*0.08,1,0.55); }
+    } else if(starFx.visible){ starFx.visible=false; }
 
     // --- 카메라: 출발 줌인(레이싱걸 클로즈업) → 주행뷰 줌아웃 ---
     let shake=0;
@@ -1978,6 +2093,34 @@ function loop(now){
   }
 
   updateWeather(dt, camera.position);
+
+  // --- 보행자 / 항공기 / 공룡 ---
+  for(const pd of pedestrians){
+    if(pd.walk){
+      pd.s += pd.dir*1.4*dt; pd.phase += dt*6;
+      const lp=place(pd.mesh, pd.s, pd.lat, 0); pd.mesh.position.y=groundY(lp,pd.lat);
+      pd.mesh.rotation.x=0; pd.mesh.rotation.y=-lp.h + (pd.dir>0?0:Math.PI);
+      const sw=Math.sin(pd.phase)*0.5, pr=pd.mesh.userData.parts;
+      if(pr){ pr['leg1'].rotation.x=sw; pr['leg-1'].rotation.x=-sw; pr['arm1'].rotation.x=-sw; pr['arm-1'].rotation.x=sw; }
+    }
+  }
+  for(const a of aircraft){
+    a.x += a.spd*dt; if(a.x>1500) a.x=-1500;
+    a.mesh.position.set(a.x, a.y, camera.position.z + a.zoff);
+    if(a.type==='heli'){ if(a.mesh.userData.rotor)a.mesh.userData.rotor.rotation.y+=dt*32; if(a.mesh.userData.tailRotor)a.mesh.userData.tailRotor.rotation.x+=dt*42; }
+  }
+  if(THEME.scene==='suburb'){
+    dinoState.t+=dt;
+    if(!dinoState.active && dinoState.t>dinoState.next){ dinoState.active=true; dinoState.t=0; dinoState.cross=0;
+      dino.visible=true; dinoState.s=(G.mode==='race'?G.s:200)+220; dinoState.lat=(Math.random()<.5?-1:1)*(SK_C*0.55); }
+    if(dinoState.active){ dinoState.cross += dt*7;
+      const dl=dinoState.lat>0? dinoState.lat-dinoState.cross : dinoState.lat+dinoState.cross;
+      const dp=place(dino,dinoState.s,dl,0); dino.position.y=groundY(dp,dl)+Math.abs(Math.sin(dinoState.cross*0.3))*0.5;
+      dino.rotation.x=0; dino.rotation.y=-dp.h+(dinoState.lat>0?Math.PI:0);
+      if(dinoState.cross > Math.abs(dinoState.lat)*2+50){ dinoState.active=false; dino.visible=false; dinoState.next=9+Math.random()*10; dinoState.t=0; }
+    }
+  } else if(dino.visible){ dino.visible=false; dinoState.active=false; }
+
   renderer.render(scene,camera);
 }
 requestAnimationFrame(loop);
