@@ -608,8 +608,8 @@ const aircraft=[];
 function makeShadow(r){ const m=new T.Mesh(new T.CircleGeometry(r,18),
   new T.MeshBasicMaterial({color:0x000000,transparent:true,opacity:0.3,depthWrite:false}));
   m.rotation.x=-Math.PI/2; scene.add(m); return m; }
-{ // [type, x, y(저공), zoff, spd, scale]
-  const defs=[['plane',-1000,46,-260,68,9],['plane',520,58,220,56,9],['heli',-300,28,-120,36,6]];
+{ // [type, x, y(저공), zoff(도로 앞), spd, scale] — 도로 앞을 아슬아슬하게 가로지름
+  const defs=[['plane',-1000,20,-55,70,9],['plane',520,26,40,60,9],['heli',-300,14,-30,42,6]];
   for(const d of defs){ const mesh=(d[0]==='plane')?makePlane():makeHelicopter(); mesh.scale.setScalar(d[5]>7?2.0:1.7); scene.add(mesh);
     aircraft.push({mesh,type:d[0],x:d[1],y:d[2],zoff:d[3],spd:d[4],shadow:makeShadow(d[5]*1.6),passT:0}); } }
 function aircraftSound(type){
@@ -623,6 +623,46 @@ function aircraftSound(type){
     o.connect(f);f.connect(g);g.connect(AC.destination);o.start();o.stop(AC.currentTime+1.1); } }
 const dino=makeDino(); dino.visible=false; scene.add(dino);
 const dinoState={active:false, t:0, next:7+Math.random()*7, s:0, lat:0, cross:0};
+
+// ====== 기찻길 + 기차 (도로 왼쪽 바깥 평행 선로) ======
+const RAIL_LAT = -(ROAD_W/2 + 30);
+function railStrip(halfW, off, color, yoff){
+  const g=new T.BufferGeometry(), v=[], idx=[];
+  for(let i=0;i<pts.length;i++){ const p=pts[i], cx=Math.cos(p.h), cz=Math.sin(p.h), gy=groundY(p,off)+yoff;
+    v.push(p.x+cx*(off-halfW), gy, p.z+cz*(off-halfW));
+    v.push(p.x+cx*(off+halfW), gy, p.z+cz*(off+halfW));
+    if(i<pts.length-1){ const k=i*2; idx.push(k,k+1,k+2,k+1,k+3,k+2); } }
+  g.setAttribute('position',new T.Float32BufferAttribute(v,3)); g.setIndex(idx); g.computeVertexNormals();
+  return new T.Mesh(g,new T.MeshLambertMaterial({color})); }
+scene.add(railStrip(2.4, RAIL_LAT, 0x6b5a44, 0.05));        // 자갈 베드
+scene.add(railStrip(0.12, RAIL_LAT-0.8, 0xa0a4ac, 0.24));   // 레일
+scene.add(railStrip(0.12, RAIL_LAT+0.8, 0xa0a4ac, 0.24));
+// 침목 (하나의 병합 지오메트리 = 드로우콜 1)
+{ const v=[], idx=[]; let vi=0;
+  for(let s=0;s<TRACK_LEN;s+=4.5){ const p=sample(s), cx=Math.cos(p.h), cz=Math.sin(p.h), gy=groundY(p,RAIL_LAT)+0.12;
+    const fx=Math.sin(p.h), fz=-Math.cos(p.h);
+    for(const c of [[-1.4,-0.28],[1.4,-0.28],[1.4,0.28],[-1.4,0.28]]){ const lat=RAIL_LAT+c[0];
+      v.push(p.x+cx*lat+fx*c[1], gy, p.z+cz*lat+fz*c[1]); }
+    idx.push(vi,vi+1,vi+2, vi,vi+2,vi+3); vi+=4; }
+  const g=new T.BufferGeometry(); g.setAttribute('position',new T.Float32BufferAttribute(v,3)); g.setIndex(idx); g.computeVertexNormals();
+  scene.add(new T.Mesh(g,new T.MeshLambertMaterial({color:0x4a3526}))); }
+function makeTrainCar(isLoco){
+  const g=new T.Group(); const col=isLoco?0x9a2b2b:[0x2b5f9a,0x2f8f4a,0xc9a14a,0x7a5fb0][Math.floor(Math.random()*4)];
+  const body=new T.Mesh(new T.BoxGeometry(2.6,2.4,7.0),new T.MeshLambertMaterial({color:col})); body.position.y=2.0; g.add(body);
+  const roof=new T.Mesh(new T.BoxGeometry(2.7,0.3,7.0),new T.MeshLambertMaterial({color:0x2a2a2e})); roof.position.y=3.3; g.add(roof);
+  for(const wz of [-2.3,2.3]) for(const wx of [-1.1,1.1]){ const w=new T.Mesh(new T.CylinderGeometry(.5,.5,.3,10),new T.MeshLambertMaterial({color:0x111114})); w.rotation.z=Math.PI/2; w.position.set(wx,0.6,wz); g.add(w); }
+  if(isLoco){ const cab=new T.Mesh(new T.BoxGeometry(2.6,1.3,2.0),new T.MeshLambertMaterial({color:0x7a1f1f})); cab.position.set(0,3.45,-2.2); g.add(cab);
+    const stack=new T.Mesh(new T.CylinderGeometry(.4,.5,1.2,8),new T.MeshLambertMaterial({color:0x202024})); stack.position.set(0,3.95,2.3); g.add(stack);
+    const lamp=new T.Mesh(new T.SphereGeometry(.3,8,6),new T.MeshBasicMaterial({color:0xffeeaa})); lamp.position.set(0,2.2,3.6); g.add(lamp); }
+  return g; }
+const trainCars=[]; for(let i=0;i<5;i++){ const c=makeTrainCar(i===0); scene.add(c); trainCars.push(c); }
+let trainS=400, trainSpd=42;
+function updateTrain(dtt){
+  trainS += trainSpd*dtt; if(trainS>TRACK_LEN) trainS-=TRACK_LEN;
+  for(let i=0;i<trainCars.length;i++){ let cs=trainS - i*8.2; if(cs<0) cs+=TRACK_LEN;
+    const p=sample(cs), c=trainCars[i];
+    c.position.set(p.x+Math.cos(p.h)*RAIL_LAT, groundY(p,RAIL_LAT)+0.55, p.z+Math.sin(p.h)*RAIL_LAT);
+    c.rotation.set(0,-p.h,0); } }
 
 // 해변: 모래·바다 평면, 파라솔
 function buildScenery(){
@@ -721,10 +761,10 @@ function buildScenery(){
       g.position.y=groundY(p2,lat2); g.rotation.x=0; addS(g);
     }
   }
-  // 사람들 (서 있기 / 걷기) — 건물·나무 근처 도로변
-  for(let s=140; s<TRACK_LEN-200; s+=72+Math.random()*70){
-    if(Math.random()<.75){
-      const side=Math.random()<.5?-1:1, lat=side*(ROAD_W/2+4+Math.random()*11);
+  // 사람들 (서 있기 / 걷기) — 건물·나무 근처 도로변 (더 많이)
+  for(let s=140; s<TRACK_LEN-200; s+=40+Math.random()*38){
+    if(Math.random()<.88){
+      const side=Math.random()<.5?-1:1, lat=side*(ROAD_W/2+4+Math.random()*13);
       const pr=makePerson(); const walk=Math.random()<.5;
       const p=place(pr,s,lat); pr.position.y=groundY(p,lat); pr.rotation.x=0;
       pr.rotation.y=-p.h+(walk?0:(side>0?Math.PI/2:-Math.PI/2));
@@ -1097,7 +1137,7 @@ const RIVAL_COLORS=[0x2b46e0,0xf2c50f,0x18a85a,0xd96bd0,0xff7a1a,0x35c9d8,0x8e44
 const rivals = RIVAL_COLORS.map((c,i)=>({
   mesh:(()=>{const m=makeCar(c,true);scene.add(m);return m;})(),
   s: -8 - i*7, lat:(i%2? 2.6:-2.6)+(Math.random()-.5),
-  base: 70 + i*1.1 + Math.random()*2, // m/s — 속도감 조정
+  base: 73 + i*0.9 + Math.random()*2, // m/s — 플레이어와 비슷하게 상향
   wob: Math.random()*6.28, lap:1, driver:i   // driver: 얼굴/목소리 인덱스
 }));
 
@@ -1193,9 +1233,9 @@ function hitRival(r){ r.spin=Math.max(r.spin||0,2.2); r.spd=0; }
 // ---------- 코스 캠페인 ----------
 // time=시작 제한시간, ck=체크포인트 보너스(구간 소요≈26~30s 기준), lap=랩 보너스
 const COURSES=[
-  {map:'suburb', name:'COURSE 1 · SUNNY SUBURB', diff:1.00, time:44, ck:26, lap:9},
-  {map:'city',   name:'COURSE 2 · NEON CITY',    diff:1.10, time:39, ck:23, lap:7},
-  {map:'beach',  name:'COURSE 3 · STORMY BEACH', diff:1.20, time:35, ck:21, lap:6},
+  {map:'suburb', name:'COURSE 1 · SUNNY SUBURB', diff:1.00, time:34, ck:24, lap:8},
+  {map:'city',   name:'COURSE 2 · NEON CITY',    diff:1.10, time:29, ck:21, lap:6},
+  {map:'beach',  name:'COURSE 3 · STORMY BEACH', diff:1.20, time:25, ck:19, lap:5},
 ];
 const TOTAL_LAPS=3;
 let unlockedCourse=1;          // 클리어로 해금된 최고 코스 (게임오버해도 유지)
@@ -1221,7 +1261,7 @@ const G={
   replayT:0, replayShot:0,// 리플레이
 };
 const CAR_DRIVER={bomba:0, thunder:1, viper:3, bull:5}; // 차→드라이버 얼굴 인덱스
-const MAXSPD = 78;       // m/s ≈ 280 km/h (속도감 30%↓ 조정)
+const MAXSPD = 72;       // m/s — 라이벌과 비슷한 속도로 하향
 // 총 진행거리(랩 포함) — 순위 판정용
 const LAP_LEN = ()=>FINISH_S;
 function playerTotal(){ return (G.lap-1)*FINISH_S + G.s; }
@@ -1278,7 +1318,7 @@ function audioInit(){
   eng={oscs,filter:flt,noiseGain,master,nflt};
 }
 // 엔진 RPM 모델: 기어가 있어 속도가 오르면 RPM이 차오르다 변속 시 뚝 떨어짐
-const GEARS=[0,13,24,36,50,66,78]; // 각 기어 상단 속도(m/s)
+const GEARS=[0,12,22,33,46,60,72]; // 각 기어 상단 속도(m/s)
 let lastGear=0;
 function updateEngine(spd, throttle){
   if(!eng||muted){ if(eng)eng.master.gain.value=0; return; }
@@ -1616,7 +1656,7 @@ function startCourse(courseNum){
   THEME=THEMES[co.map]; buildScenery();
   G.mode='countdown'; G.s=0; G.lat=0; G.spd=0; G.time=co.time; G.nextCk=0; G.lap=1; G.introCam=0;
   G.countdown=4.4; G.tauntT=6;
-  rivals.forEach((r,i)=>{ r.s=-8-i*7; r.spd=0; r.lap=1; r.base=70+i*1.1+Math.random()*2; });
+  rivals.forEach((r,i)=>{ r.s=-8-i*7; r.spd=0; r.lap=1; r.base=73+i*0.9+Math.random()*2; });
   resetRaceObjects();
   selEl.classList.remove('on'); titleEl.style.display='none'; carselEl.classList.remove('on');
   ui.result.classList.remove('on');
@@ -1910,6 +1950,7 @@ function updateReplay(rdt, now){
   for(const r of rivals){ r.s += (r.base||60)*rdt*0.7; if(r.s>=FINISH_S) r.s-=FINISH_S; place(r.mesh, Math.max(r.s,0), r.lat, 0); }
   for(const t of traffic){ t.s += t.spd*rdt; if(t.s>TRACK_LEN-60) t.s=200; place(t.mesh,t.s,t.lat,0); }
   for(const a of aircraft){ a.x+=a.spd*rdt; if(a.x>1500)a.x=-1500; const az=camera.position.z+a.zoff; a.mesh.position.set(a.x,a.y,az); if(a.shadow)a.shadow.position.set(a.x,0.3,az); if(a.type==='heli'&&a.mesh.userData.rotor)a.mesh.userData.rotor.rotation.y+=rdt*32; }
+  updateTrain(rdt);
   G.replayT+=rdt; if(G.replayT>3.2){ G.replayT=0; G.replayShot=(G.replayShot+1)%4; }
   applyReplayCam(G.replayShot, now);
   updateEngine(G.spd, true);
@@ -2217,15 +2258,19 @@ function loop(now){
     if(a.passT>0) a.passT-=dt;
     if(Math.abs(a.x-camera.position.x)<70 && a.passT<=0){ aircraftSound(a.type); a.passT=5; }
   }
+  updateTrain(dt);
   if(THEME.scene==='suburb'){
     dinoState.t+=dt;
     if(!dinoState.active && dinoState.t>dinoState.next){ dinoState.active=true; dinoState.t=0; dinoState.cross=0;
-      dino.visible=true; dinoState.s=(G.mode==='race'?G.s:200)+220; dinoState.lat=(Math.random()<.5?-1:1)*(SK_C*0.55); }
-    if(dinoState.active){ dinoState.cross += dt*7;
-      const dl=dinoState.lat>0? dinoState.lat-dinoState.cross : dinoState.lat+dinoState.cross;
-      const dp=place(dino,dinoState.s,dl,0); dino.position.y=groundY(dp,dl)+Math.abs(Math.sin(dinoState.cross*0.3))*0.5;
-      dino.rotation.x=0; dino.rotation.y=-dp.h+(dinoState.lat>0?Math.PI:0);
-      if(dinoState.cross > Math.abs(dinoState.lat)*2+50){ dinoState.active=false; dino.visible=false; dinoState.next=9+Math.random()*10; dinoState.t=0; }
+      dino.visible=true; dinoState.s=(G.mode==='race'?G.s:200)+120;        // 앞쪽 도로
+      dinoState.lat=(Math.random()<.5?-1:1)*(ROAD_W/2+16); }               // 한쪽 갓길에서 시작
+    if(dinoState.active){
+      dinoState.cross += dt*9;                                              // 도로를 가로질러 걷기
+      const dir=dinoState.lat>0?-1:1, dl=dinoState.lat + dir*dinoState.cross;
+      const dp=sample(dinoState.s); const gy=groundY(dp,dl);
+      dino.position.set(dp.x+Math.cos(dp.h)*dl, gy+Math.abs(Math.sin(dinoState.cross*0.5))*0.5, dp.z+Math.sin(dp.h)*dl);
+      dino.rotation.set(0, -dp.h + (dir>0?Math.PI/2:-Math.PI/2), 0);
+      if(dinoState.cross > Math.abs(dinoState.lat)*2+8){ dinoState.active=false; dino.visible=false; dinoState.next=8+Math.random()*8; dinoState.t=0; }
     }
   } else if(dino.visible){ dino.visible=false; dinoState.active=false; }
 
