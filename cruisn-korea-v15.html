@@ -20,6 +20,13 @@
   html,body{width:100%;height:100%;overflow:hidden;background:#000;font-family:"Arial Black","Helvetica Neue",Arial,sans-serif}
   #game{position:fixed;inset:0}
   canvas{display:block}
+  /* 화면 플래시 / 큰 아이콘 연출 */
+  #flash{position:fixed;inset:0;z-index:18;pointer-events:none;opacity:0;background:#fff;mix-blend-mode:screen}
+  #flash.rainbow{background:linear-gradient(120deg,#ff0055,#ffd200,#00e1ff,#a64dff,#ff0055);background-size:300% 300%;animation:rbshift .6s linear infinite}
+  @keyframes rbshift{0%{background-position:0% 50%}100%{background-position:300% 50%}}
+  #bigicon{position:fixed;left:50%;top:42%;transform:translate(-50%,-50%) scale(.2);z-index:19;pointer-events:none;font-size:clamp(70px,18vw,150px);opacity:0;filter:drop-shadow(0 4px 12px #000a)}
+  #bigicon.pop{animation:bigpop .9s ease-out}
+  @keyframes bigpop{0%{opacity:0;transform:translate(-50%,-50%) scale(.2) rotate(-20deg)}25%{opacity:1;transform:translate(-50%,-50%) scale(1.25) rotate(8deg)}60%{opacity:1;transform:translate(-50%,-50%) scale(1) rotate(0)}100%{opacity:0;transform:translate(-50%,-60%) scale(1.1)}}
 
   /* ===== HUD ===== */
   .hud{position:fixed;inset:0;pointer-events:none;display:none;z-index:10}
@@ -123,6 +130,8 @@
 </head>
 <body>
 <div id="game"></div>
+<div id="flash"></div>
+<div id="bigicon"></div>
 <div id="ver" style="position:fixed;bottom:4px;right:6px;z-index:40;color:#ffffff66;font:700 10px monospace;pointer-events:none">v15</div>
 <div id="tts-badge" style="position:fixed;bottom:4px;left:6px;z-index:40;color:#ffffff66;font:700 11px monospace;pointer-events:none"></div>
 <button id="newtab" style="position:fixed;bottom:54px;left:50%;transform:translateX(-50%);z-index:40;display:none;pointer-events:auto;background:rgba(255,215,34,.92);color:#222;border:none;border-radius:16px;padding:5px 14px;font:900 11px sans-serif;cursor:pointer;white-space:nowrap;box-shadow:0 2px 8px #0006">🔊 새 탭에서 열면 음성 ON</button>
@@ -986,7 +995,7 @@ const RIVAL_COLORS=[0x2b46e0,0xf2c50f,0x18a85a,0xd96bd0,0xff7a1a,0x35c9d8,0x8e44
 const rivals = RIVAL_COLORS.map((c,i)=>({
   mesh:(()=>{const m=makeCar(c,true);scene.add(m);return m;})(),
   s: -8 - i*7, lat:(i%2? 2.6:-2.6)+(Math.random()-.5),
-  base: 100 + i*1.6 + Math.random()*3, // m/s — 플레이어 풀스피드급
+  base: 70 + i*1.1 + Math.random()*2, // m/s — 속도감 조정
   wob: Math.random()*6.28, lap:1, driver:i   // driver: 얼굴/목소리 인덱스
 }));
 
@@ -997,7 +1006,7 @@ for(let s=260; s<TRACK_LEN-500; s+=150+Math.random()*160){
   const lane = [-ROAD_W*0.27,-ROAD_W*0.09,ROAD_W*0.09,ROAD_W*0.27][Math.floor(Math.random()*4)];
   const m=makeCar(TRAFFIC_COLORS[Math.floor(Math.random()*TRAFFIC_COLORS.length)],false);
   scene.add(m);
-  traffic.push({mesh:m, s, lat:lane, spd:21+Math.random()*11});
+  traffic.push({mesh:m, s, lat:lane, spd:15+Math.random()*8});
 }
 
 // ====== 마리오카트식 아이템 / 부스트 / 점프 시스템 ======
@@ -1069,10 +1078,11 @@ function spawnMissile(s,lat,homing,target){
 function hitRival(r){ r.spin=Math.max(r.spin||0,2.2); r.spd=0; }
 
 // ---------- 코스 캠페인 ----------
+// time=시작 제한시간, ck=체크포인트 보너스(구간 소요≈26~30s 기준), lap=랩 보너스
 const COURSES=[
-  {map:'suburb', name:'COURSE 1 · SUNNY SUBURB', diff:1.00},
-  {map:'city',   name:'COURSE 2 · NEON CITY',    diff:1.12},
-  {map:'beach',  name:'COURSE 3 · STORMY BEACH', diff:1.24},
+  {map:'suburb', name:'COURSE 1 · SUNNY SUBURB', diff:1.00, time:34, ck:26, lap:9},
+  {map:'city',   name:'COURSE 2 · NEON CITY',    diff:1.10, time:29, ck:23, lap:7},
+  {map:'beach',  name:'COURSE 3 · STORMY BEACH', diff:1.20, time:25, ck:21, lap:6},
 ];
 const TOTAL_LAPS=3;
 let unlockedCourse=1;          // 클리어로 해금된 최고 코스 (게임오버해도 유지)
@@ -1091,10 +1101,12 @@ const G={
   items:[null,null],     // Z슬롯, X슬롯
   star:0, boost:0,       // 무적/부스트 남은 시간
   airT:0, airDur:0, airY:0, // 점프
+  rollT:0, rollDur:0,    // 강한 충돌 롤아웃(구르기)
+  tauntT:6,              // 라이벌 도발 타이머
   playerDriver:0,
 };
 const CAR_DRIVER={bomba:0, thunder:1, viper:3, bull:5}; // 차→드라이버 얼굴 인덱스
-const MAXSPD = 112;      // m/s ≈ 400 km/h (초고속 사양)
+const MAXSPD = 78;       // m/s ≈ 280 km/h (속도감 30%↓ 조정)
 // 총 진행거리(랩 포함) — 순위 판정용
 const LAP_LEN = ()=>FINISH_S;
 function playerTotal(){ return (G.lap-1)*FINISH_S + G.s; }
@@ -1151,7 +1163,7 @@ function audioInit(){
   eng={oscs,filter:flt,noiseGain,master,nflt};
 }
 // 엔진 RPM 모델: 기어가 있어 속도가 오르면 RPM이 차오르다 변속 시 뚝 떨어짐
-const GEARS=[0,18,34,52,72,95,112]; // 각 기어 상단 속도(m/s)
+const GEARS=[0,13,24,36,50,66,78]; // 각 기어 상단 속도(m/s)
 let lastGear=0;
 function updateEngine(spd, throttle){
   if(!eng||muted){ if(eng)eng.master.gain.value=0; return; }
@@ -1392,8 +1404,8 @@ function say(text, priority){
     if(priority) speechSynthesis.cancel();
     if(speechSynthesis.paused) speechSynthesis.resume();
     const u=new SpeechSynthesisUtterance(text);
-    u.lang='ko-KR'; if(TTS.voice)u.voice=TTS.voice;
-    u.rate=1.15; u.pitch=1.1; u.volume=1.0;   // 흥분한 캐스터 톤
+    u.lang='ko-KR'; u.voice=(typeof CASTER_VOICE!=='undefined'&&CASTER_VOICE)||TTS.voice||null;
+    u.rate=1.08; u.pitch=1.04; u.volume=1.0;   // 자연스러운 캐스터 톤
     speechSynthesis.speak(u);
   }catch(e){}
 }
@@ -1487,9 +1499,9 @@ function startCourse(courseNum){
   const co=COURSES[G.course-1];
   G.diff=co.diff;
   THEME=THEMES[co.map]; buildScenery();
-  G.mode='countdown'; G.s=0; G.lat=0; G.spd=0; G.time=70; G.nextCk=0; G.lap=1; G.introCam=0;
-  G.countdown=4.4;
-  rivals.forEach((r,i)=>{ r.s=-8-i*7; r.spd=0; r.lap=1; r.base=100+i*1.6+Math.random()*3; });
+  G.mode='countdown'; G.s=0; G.lat=0; G.spd=0; G.time=co.time; G.nextCk=0; G.lap=1; G.introCam=0;
+  G.countdown=4.4; G.tauntT=6;
+  rivals.forEach((r,i)=>{ r.s=-8-i*7; r.spd=0; r.lap=1; r.base=70+i*1.1+Math.random()*2; });
   resetRaceObjects();
   selEl.classList.remove('on'); titleEl.style.display='none'; carselEl.classList.remove('on');
   ui.result.classList.remove('on');
@@ -1579,19 +1591,60 @@ function failTimeout(){
 }
 function fmt(t){const m=Math.floor(t/60),s=(t%60).toFixed(1);return m+"'"+(s<10?'0':'')+s+'"';}
 
+// ====== 화면 연출 + 효과음 ======
+function flashScreen(color,dur){ const f=$('flash'); if(!f)return; f.classList.remove('rainbow');
+  f.style.background=color||'#fff'; f.style.transition='none'; f.style.opacity='0.8';
+  void f.offsetWidth; f.style.transition='opacity '+(dur||0.4)+'s ease-out'; f.style.opacity='0'; }
+function flashRainbow(dur){ const f=$('flash'); if(!f)return; f.classList.add('rainbow');
+  f.style.transition='none'; f.style.opacity='0.55'; void f.offsetWidth;
+  f.style.transition='opacity '+(dur||1)+'s ease-out'; f.style.opacity='0';
+  setTimeout(function(){ f.classList.remove('rainbow'); }, (dur||1)*1000); }
+function bigIcon(txt){ const b=$('bigicon'); if(!b)return; b.textContent=txt; b.classList.remove('pop'); void b.offsetWidth; b.classList.add('pop'); }
+function whoosh(){ if(!AC||muted)return; const o=AC.createOscillator(),g=AC.createGain();
+  o.type='sawtooth'; o.frequency.setValueAtTime(900,AC.currentTime); o.frequency.exponentialRampToValueAtTime(160,AC.currentTime+0.4);
+  g.gain.setValueAtTime(.22,AC.currentTime); g.gain.exponentialRampToValueAtTime(.001,AC.currentTime+0.45);
+  o.connect(g); g.connect(AC.destination); o.start(); o.stop(AC.currentTime+0.5); }
+function jingle(arr){ if(!AC||muted)return; arr.forEach(function(f,i){ setTimeout(function(){ beep(f,.14,'square',.2); }, i*70); }); }
+function thunderSound(){ if(!AC||muted)return; const o=AC.createOscillator(),g=AC.createGain();
+  o.type='sawtooth'; o.frequency.setValueAtTime(70,AC.currentTime); o.frequency.exponentialRampToValueAtTime(30,AC.currentTime+0.9);
+  g.gain.setValueAtTime(.0001,AC.currentTime); g.gain.linearRampToValueAtTime(.4,AC.currentTime+.04); g.gain.exponentialRampToValueAtTime(.001,AC.currentTime+1.1);
+  o.connect(g); g.connect(AC.destination); o.start(); o.stop(AC.currentTime+1.2); }
+function startRollout(){
+  G.rollT=G.rollDur=1.8; G.spd*=0.3; G.crashT=2.0; G.shakeT=.9;
+  msg('CRASH! 💥','#ff3322'); beep(80,.5,'sawtooth',.45); thunderSound(); flashScreen('#ff2a1a',.45);
+  playerSay('shock'); say('크게 부딪혔습니다! 차가 세 바퀴 구릅니다!',true);
+}
+
 // ====== 얼굴 HUD + 다중 음성 TTS ======
 const FACE_W=104, FACE_H=138, _bgW=FACE_W*8, _bgH=FACE_H*4;
 let _voices=[];
-function loadVoices(){ try{_voices=speechSynthesis.getVoices()||[];}catch(e){_voices=[];} }
-if('speechSynthesis' in window){ loadVoices(); try{speechSynthesis.addEventListener('voiceschanged',loadVoices);}catch(e){} }
 const DRIVER_GENDER=['M','M','M','F','F','M','F','F'];
+// 자동 배정: 한국어 자연(Natural/Online) 음성 우선, 남/녀 분리
+let DRIVER_VOICE=[], CASTER_VOICE=null;
+const MALE_RE=/injoon|hyunsu|gilbert|in-joon|male|\bman\b/i;
+function assignVoices(){
+  const ko=_voices.filter(v=>/^ko/i.test(v.lang));
+  ko.sort((a,b)=>(/(natural|online)/i.test(b.name)?1:0)-(/(natural|online)/i.test(a.name)?1:0));
+  if(!ko.length){ DRIVER_VOICE=[]; CASTER_VOICE=_voices[0]||null; return; }
+  const male=ko.filter(v=>MALE_RE.test(v.name)), female=ko.filter(v=>!MALE_RE.test(v.name));
+  const pickFrom=(arr,i)=> arr.length? arr[i%arr.length] : ko[i%ko.length];
+  DRIVER_VOICE=[];
+  for(let d=0; d<8; d++){ DRIVER_VOICE[d] = DRIVER_GENDER[d]==='M'? pickFrom(male,d) : pickFrom(female,d); }
+  CASTER_VOICE = male[0] || ko[ko.length>1?1:0] || ko[0];   // 중계는 라이벌과 살짝 다르게
+}
+function loadVoices(){ try{_voices=speechSynthesis.getVoices()||[];}catch(e){_voices=[];} assignVoices(); }
+if('speechSynthesis' in window){ loadVoices(); try{speechSynthesis.addEventListener('voiceschanged',loadVoices);}catch(e){} }
 function speakAs(d,text){
   if(muted||!('speechSynthesis' in window))return;
   try{
-    const u=new SpeechSynthesisUtterance(text), female=DRIVER_GENDER[d]==='F';
-    u.lang='ko-KR'; u.pitch=(female?1.4:0.68)+((d*0.11)%0.28); u.rate=1.04+((d*0.07)%0.22); u.volume=1;
-    const ko=_voices.filter(x=>/ko/i.test(x.lang));
-    if(ko.length) u.voice=ko[d%ko.length]; else if(_voices.length) u.voice=_voices[(female?1:0)+d*2 < _voices.length ? (female?1:0)+d*2 : d%_voices.length];
+    if(speechSynthesis.paused) speechSynthesis.resume();
+    const u=new SpeechSynthesisUtterance(text), v=DRIVER_VOICE[d];
+    u.lang='ko-KR'; if(v) u.voice=v;
+    // 자연스러운 톤: pitch/rate는 1.0 부근에서 캐릭터별 미세 변주
+    u.pitch=1.0 + (((d*37)%7)-3)*0.05;   // -0.15 ~ +0.15
+    u.rate =1.0 + (((d*53)%5)-2)*0.05;   // -0.10 ~ +0.10 (자연음성은 과한 변형 X)
+    if(!v && DRIVER_GENDER[d]==='M') u.pitch=0.7;  // 음성 1개뿐이면 남성은 pitch로 흉내
+    u.volume=1;
     speechSynthesis.speak(u);
   }catch(e){}
 }
@@ -1623,23 +1676,28 @@ function playerSay(kind){ const L=LINES[kind]; if(!L)return; showFace('L', G.pla
 function updateItemHud(){ for(let i=0;i<2;i++){ const ic=$('iicon'+i); if(ic) ic.textContent=G.items[i]?itemIcon(G.items[i]):''; } }
 function giveItem(){
   let slot=G.items[0]==null?0:(G.items[1]==null?1:-1); if(slot<0) return false;
-  G.items[slot]=randItemKey();
+  const k=randItemKey(); G.items[slot]=k;
   const el=$('islot'+slot); if(el){ el.classList.remove('flash'); void el.offsetWidth; el.classList.add('flash'); }
-  updateItemHud(); beep(1320,.12); return true;
+  updateItemHud();
+  flashScreen('#ffffff',.3); bigIcon(itemIcon(k)); jingle([784,988,1318]); msg('ITEM GET!','#ffd722');
+  return true;
 }
 function useItem(slot){
   const k=G.items[slot]; if(!k||G.mode!=='race') return;
-  G.items[slot]=null; updateItemHud(); beep(520,.1);
-  if(k==='banana'){ spawnBanana(G.s-7,G.lat); }
+  G.items[slot]=null; updateItemHud();
+  if(k==='banana'){ spawnBanana(G.s-7,G.lat); beep(200,.2,'square',.28); bigIcon('🍌'); flashScreen('#f4d21e',.2); }
   else if(k==='homing'){
     let tgt=null,best=1e9;
     for(const r of rivals){ const d=rivalTotal(r)-playerTotal(); if(d>0&&d<300&&d<best){best=d;tgt=r;} }
-    spawnMissile(G.s+6,G.lat,true,tgt);
+    spawnMissile(G.s+6,G.lat,true,tgt); whoosh(); bigIcon('🎯'); flashScreen('#ff8844',.22);
     if(tgt) rivalSay(tgt,'missileSeen'); else msg('전방 표적 없음','#ff5147');
   }
-  else if(k==='missiles'){ for(const off of [-2.4,0,2.4]) spawnMissile(G.s+6,G.lat+off,false,null); }
-  else if(k==='lightning'){ for(const r of rivals) r.shrink=5; msg('⚡ LIGHTNING!','#7df1ff'); rivalSay(rivals[Math.floor(Math.random()*rivals.length)],'shock'); }
-  else if(k==='star'){ G.star=10; msg('⭐ INVINCIBLE!','#ffd722'); playerSay('happy'); }
+  else if(k==='missiles'){ for(const off of [-2.4,0,2.4]) spawnMissile(G.s+6,G.lat+off,false,null);
+    whoosh(); setTimeout(whoosh,90); setTimeout(whoosh,180); bigIcon('🚀'); flashScreen('#ff8844',.22); }
+  else if(k==='lightning'){ for(const r of rivals) r.shrink=5; msg('⚡ LIGHTNING!','#7df1ff');
+    thunderSound(); flashScreen('#ffffff',.5); bigIcon('⚡'); rivalSay(rivals[Math.floor(Math.random()*rivals.length)],'shock'); }
+  else if(k==='star'){ G.star=10; msg('⭐ INVINCIBLE!','#ffd722');
+    jingle([523,659,784,1047,1319]); flashRainbow(1.1); bigIcon('⭐'); playerSay('happy'); }
 }
 function resetRaceObjects(){
   G.items=[null,null]; G.star=0; G.boost=0; G.airT=0; G.airDur=0; G.airY=0;
@@ -1718,25 +1776,26 @@ function loop(now){
 
     // --- 플레이어 물리 (차량 성능 + 부스트/무적/점프 반영) ---
     const car = G.car || CARS[0];
-    if(racing){ if(G.boost>0)G.boost-=dt; if(G.star>0)G.star-=dt; }
-    const boosting=G.boost>0, invinc=G.star>0, airborne=G.airT>0;
+    if(racing){ if(G.boost>0)G.boost-=dt; if(G.star>0)G.star-=dt; if(G.rollT>0)G.rollT-=dt; }
+    const boosting=G.boost>0, invinc=G.star>0, airborne=G.airT>0, rolling=G.rollT>0;
     const offRoad = Math.abs(G.lat)>ROAD_W/2-1;
     const grade = slope(G.s);
     let cap = (offRoad&&!invinc? MAXSPD*.45*car.grip : MAXSPD) * car.maxMul;
     if(boosting) cap*=1.6;
     if(grade<-.015) cap*=1.15;              // 내리막 오버스피드 허용
     const acc=car.accel*(boosting?3:1);
-    if(racing&&input.G) G.spd += (G.spd<cap? acc*dt : -22*dt);
+    if(rolling){ G.spd -= 120*dt; }                          // 구르는 동안 급정지
+    else if(racing&&input.G) G.spd += (G.spd<cap? acc*dt : -22*dt);
     else if(racing&&input.B&&!boosting) G.spd -= 60*dt;
     else G.spd -= (boosting||invinc)?0:8*dt;
-    if(!invinc) G.spd -= grade*22*dt;       // 오르막은 무겁게, 내리막은 쭉
+    if(!invinc&&!rolling) G.spd -= grade*22*dt;
     if(G.spd>cap) G.spd=Math.max(cap,G.spd-30*dt);
-    if(invinc) G.spd=Math.max(G.spd, cap*0.96);   // 무적: 풀스피드 유지
+    if(invinc&&!rolling) G.spd=Math.max(G.spd, cap*0.96);    // 무적: 풀스피드 유지
     G.spd=Math.max(0,G.spd);
 
-    const want=(input.L?-1:0)+(input.R?1:0);
+    const want=rolling?0:((input.L?-1:0)+(input.R?1:0));
     G.steer += (want-G.steer)*Math.min(1,dt*9);
-    G.lat += G.steer * (8+Math.min(G.spd,75)*.14) * car.handle * (airborne?0.3:1) * dt;
+    G.lat += G.steer * (8+Math.min(G.spd,75)*.14) * car.handle * (airborne?0.3:1) * (rolling?0:1) * dt;
     G.lat = Math.max(-ROAD_W/2-4.5, Math.min(ROAD_W/2+4.5, G.lat));
     G.s += G.spd*dt;
 
@@ -1757,9 +1816,10 @@ function loop(now){
       if(G.crashT<=0 && ds>-3 && ds<4 && Math.abs(t.lat-G.lat)<2.1){
         if(invinc){ t.s=200; G.shakeT=.15; beep(320,.08); }          // 무적: 튕겨냄
         else if(G.spd>t.spd+2){
-          const keep=Math.min(.7,.35*car.crashRes);                  // 내구성 높을수록 속도 덜 잃음
-          G.spd=Math.max(t.spd*.6, G.spd*keep); G.crashT=1.2/Math.sqrt(car.crashRes); G.shakeT=.5;
-          msg('CRASH!','#ff5147'); beep(110,.3,'sawtooth',.3); say(pick(SAY.crash),true); playerSay('shock');
+          if(G.spd > MAXSPD*0.56){ startRollout(); }                 // 고속 추돌 → 3바퀴 구르기
+          else { const keep=Math.min(.45,.18*car.crashRes);          // 충돌 감속 강화
+            G.spd=Math.max(t.spd*.4, G.spd*keep); G.crashT=1.3/Math.sqrt(car.crashRes); G.shakeT=.6;
+            msg('CRASH!','#ff5147'); beep(110,.3,'sawtooth',.3); say(pick(SAY.crash),true); playerSay('shock'); flashScreen('#ff5533',.25); }
         }
       }
     }
@@ -1768,7 +1828,10 @@ function loop(now){
       const ds=r.s-G.s;
       if(G.crashT<=0 && ds>-3 && ds<4 && Math.abs(r.lat-G.lat)<2.0){
         if(invinc){ hitRival(r); rivalSay(r,'shock'); G.crashT=.3; G.shakeT=.2; beep(320,.1); }  // 무적: 라이벌 회전
-        else if(G.spd>r.spd){ G.spd*=Math.min(.85,.7*car.crashRes); G.crashT=.8; G.shakeT=.3; beep(150,.2,'sawtooth',.22); }
+        else if(G.spd>r.spd){
+          if(G.spd-r.spd > MAXSPD*0.42){ startRollout(); }           // 고속 추돌 → 구르기
+          else { G.spd*=Math.min(.6,.45*car.crashRes); G.crashT=1.0; G.shakeT=.4; beep(150,.2,'sawtooth',.22); flashScreen('#ff5533',.2); }
+        }
       }
     }
 
@@ -1820,15 +1883,23 @@ function loop(now){
       }
       // 시간 부족 경고 (한 번만)
       if(G.time<8 && !TTS.warnedTime){ say(pick(SAY.timeLow),true); TTS.warnedTime=true; }
+      // 라이벌 주기적 도발 (가까운 라이벌이 남/녀 목소리로)
+      G.tauntT-=dt;
+      if(G.tauntT<=0){ G.tauntT=6+Math.random()*5;
+        const near=rivals.filter(r=>(r.spin||0)<=0 && Math.abs(rivalTotal(r)-playerTotal())<130);
+        if(near.length){ const r=near[Math.floor(Math.random()*near.length)];
+          rivalSay(r, rivalTotal(r)>playerTotal()?'taunt':'angry'); }
+      }
 
+      const _co=COURSES[G.course-1];
       if(G.nextCk<checkpoints.length && G.s>checkpoints[G.nextCk]){
-        G.nextCk++; G.time+=16;
-        msg('CHECK POINT! +16','#7df1ff'); beep(988,.12);setTimeout(()=>beep(1318,.18),110); say(pick(SAY.checkpoint));
+        G.nextCk++; G.time+=_co.ck;
+        msg('CHECK POINT! +'+_co.ck,'#7df1ff'); beep(988,.12);setTimeout(()=>beep(1318,.18),110); say(pick(SAY.checkpoint));
       }
       // 랩 통과 / 코스 완주
       if(G.s>=FINISH_S){
         if(G.lap<TOTAL_LAPS){
-          G.lap++; G.s-=FINISH_S; G.nextCk=0; G.time+=12;
+          G.lap++; G.s-=FINISH_S; G.nextCk=0; G.time+=_co.lap;
           msg('LAP '+G.lap+' / '+TOTAL_LAPS,'#ffd722'); beep(880,.2);setTimeout(()=>beep(1175,.25),140);
           say(G.lap+'바퀴째 진입합니다! 남은 '+(TOTAL_LAPS-G.lap+1)+'바퀴!',true);
           updateLapHud();
@@ -1845,6 +1916,8 @@ function loop(now){
     player.rotation.z = -G.steer*.14;
     player.rotation.y += -G.steer*.18;
     player.scale.setScalar(invinc? 1+0.06*Math.sin(now*.02):1);  // 무적 펄스
+    if(rolling){ const prog=1-Math.max(0,G.rollT)/G.rollDur;     // 3바퀴 구르기
+      player.rotation.z = prog*Math.PI*6; player.position.y += Math.sin(prog*Math.PI)*1.3; }
 
     // --- 카메라: 출발 줌인(레이싱걸 클로즈업) → 주행뷰 줌아웃 ---
     let shake=0;
