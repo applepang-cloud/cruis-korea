@@ -643,6 +643,13 @@ function dinoRoar(){ if(!AC||muted)return; const o=AC.createOscillator(),g=AC.cr
 const dino=makeDino(); dino.visible=false; scene.add(dino);
 const dinoState={active:false, t:0, next:7+Math.random()*7, s:0, lat:0, cross:0};
 
+// 길가 사람 이미지 빌보드 (person0~7.png, 8명)
+const PERSON_MATS=[];
+for(let i=0;i<8;i++){ const tex=new T.TextureLoader().load('person'+i+'.png');
+  tex.minFilter=T.LinearFilter; tex.generateMipmaps=false;
+  PERSON_MATS.push(new T.SpriteMaterial({map:tex, transparent:true, depthWrite:false})); }
+function makePersonBillboard(i){ const s=new T.Sprite(PERSON_MATS[i%8]); s.scale.set(0.95,3.4,1); return s; }
+
 // ====== 기찻길 + 기차 (도로 왼쪽 바깥 평행 선로) ======
 const RAIL_LAT = -(ROAD_W/2 + 7);   // 도로 왼쪽 갓길 바로 옆 (충돌 가능)
 function railStrip(halfW, off, color, yoff){
@@ -792,6 +799,13 @@ function buildScenery(){
       addS(pr); pedestrians.push({mesh:pr,s,lat,walk,phase:Math.random()*6.28,dir:Math.random()<.5?1:-1});
     }
   }
+  // 길가 사람 이미지 빌보드 (서 있는 8명, 도로 옆)
+  for(let s=120; s<TRACK_LEN-150; s+=46+Math.random()*46){
+    if(Math.random()<.8){ const side=Math.random()<.5?-1:1, lat=side*(ROAD_W/2+3+Math.random()*9);
+      const sp=makePersonBillboard(Math.floor(Math.random()*8));
+      const p=sample(s); sp.position.set(p.x+Math.cos(p.h)*lat, groundY(p,lat)+1.7, p.z+Math.sin(p.h)*lat);
+      addS(sp); }
+  }
   // 중앙선 칸막이/나무 (파괴 가능)
   for(let s=220; s<TRACK_LEN-200; s+=80+Math.random()*90){
     if(Math.random()<.5){ const ob=(Math.random()<.5?makeBarrier():makeBush()); const lat=(Math.random()-.5)*1.4;
@@ -807,8 +821,8 @@ function buildScenery(){
 }
 
 // ---------- 체크포인트 아치 & 피니시 ----------
-const CKPT_GAP = 1800;
-const checkpoints=[]; // s 위치들
+const CKPT_GAP = 300;   // 촘촘한 타임 마커(+5초씩), 아치는 6개마다
+const checkpoints=[]; // {s, arch}
 function arch(s, txt, color){
   const g=new T.Group();
   const mat=new T.MeshLambertMaterial({color:0xdddddd});
@@ -826,7 +840,7 @@ function arch(s, txt, color){
   g.add(L,R,banner);
   place(g,s,0); scene.add(g);
 }
-for(let s=CKPT_GAP; s<TRACK_LEN-600; s+=CKPT_GAP){ checkpoints.push(s); arch(s,'CHECK POINT','#1a3fae'); }
+{ let _n=0; for(let s=CKPT_GAP; s<TRACK_LEN-600; s+=CKPT_GAP){ const isArch=(_n%6===0); checkpoints.push({s:s,arch:isArch}); if(isArch) arch(s,'CHECK POINT','#1a3fae'); _n++; } }
 arch(TRACK_LEN-220,'FINISH','#b41710');
 const FINISH_S = TRACK_LEN-220;
 
@@ -1287,9 +1301,9 @@ function hitPlayer(){            // 라이벌 아이템에 맞음 → 스핀(전
 // ---------- 코스 캠페인 ----------
 // time=시작 제한시간, ck=체크포인트 보너스(구간 소요≈26~30s 기준), lap=랩 보너스
 const COURSES=[
-  {map:'suburb', name:'COURSE 1 · SUNNY SUBURB', diff:1.00, time:32, ck:44, lap:12, laps:2},
-  {map:'city',   name:'COURSE 2 · NEON CITY',    diff:1.08, time:28, ck:40, lap:10, laps:2},
-  {map:'beach',  name:'COURSE 3 · STORMY BEACH', diff:1.16, time:24, ck:36, lap:8,  laps:3},
+  {map:'suburb', name:'COURSE 1 · SUNNY SUBURB', diff:1.00, time:52, ck:5, lap:5, laps:2},
+  {map:'city',   name:'COURSE 2 · NEON CITY',    diff:1.08, time:48, ck:5, lap:5, laps:2},
+  {map:'beach',  name:'COURSE 3 · STORMY BEACH', diff:1.16, time:44, ck:5, lap:5, laps:3},
 ];
 let TOTAL_LAPS=3;   // 코스 시작 시 COURSES[c].laps로 설정
 let unlockedCourse=1;          // 클리어로 해금된 최고 코스 (게임오버해도 유지)
@@ -2231,9 +2245,10 @@ function loop(now){
       }
 
       const _co=COURSES[G.course-1];
-      if(G.nextCk<checkpoints.length && G.s>checkpoints[G.nextCk]){
-        G.nextCk++; G.time+=_co.ck;
-        msg('CHECK POINT! +'+_co.ck,'#7df1ff'); beep(988,.12);setTimeout(()=>beep(1318,.18),110); say(pick(SAY.checkpoint));
+      if(G.nextCk<checkpoints.length && G.s>checkpoints[G.nextCk].s){
+        const cp=checkpoints[G.nextCk]; G.nextCk++; G.time+=_co.ck;
+        if(cp.arch){ msg('CHECK POINT! +'+_co.ck,'#7df1ff'); beep(988,.12);setTimeout(()=>beep(1318,.18),110); say(pick(SAY.checkpoint)); startCine('checkpoint',1.0); }
+        else beep(900,.05,'square',.08);
       }
       // 랩 통과 / 코스 완주
       if(G.s>=FINISH_S){
@@ -2290,15 +2305,27 @@ function loop(now){
       camera.position.lerp(tgt,0.18);
       camera.lookAt(focus.x, focus.y+1.2, focus.z);
       camera.fov=40;
-    } else if(G.mode==='countdown' || G.introCam>0){
-      // 레이싱걸 클로즈업 (도로 쪽에서 걸을 바라봄)
+    } else if(G.mode==='countdown'){
+      if(G.countdown>3.0){
+        // 시작: 내 차 뒷모습 + 다른 차들 보이게 (뒤에서)
+        const sp0=sample(0), fx=Math.sin(sp0.h), fz=-Math.cos(sp0.h);
+        camera.position.set(sp0.x - fx*15, sp0.y+4.2, sp0.z - fz*15);
+        camera.lookAt(sp0.x + fx*8, sp0.y+1.0, sp0.z + fz*8);
+        camera.fov=62;
+      } else {
+        // 카운트 3,2,1 — 레이싱걸 크게
+        const gp=raceGirl.position, gcp=sample(8);
+        camera.position.set(gcp.x+Math.cos(gcp.h)*(-1.7), gcp.y+1.85, gcp.z+Math.sin(gcp.h)*(-1.7));
+        camera.lookAt(gp.x, gp.y+1.7, gp.z);
+        camera.fov=38;
+      }
+    } else if(G.introCam>0){
+      // GO 이후: 레이싱걸 클로즈업 → 주행뷰 줌아웃
       const gp=raceGirl.position, gcp=sample(8);
-      const introPos=new T.Vector3(gcp.x+Math.cos(gcp.h)*(-2.0), gcp.y+1.9, gcp.z+Math.sin(gcp.h)*(-2.0));
+      const introPos=new T.Vector3(gcp.x+Math.cos(gcp.h)*(-1.7), gcp.y+1.85, gcp.z+Math.sin(gcp.h)*(-1.7));
       const introLook=new T.Vector3(gp.x, gp.y+1.7, gp.z);
-      const introFov=44;
-      let t;
-      if(G.mode==='countdown') t=0;
-      else { G.introCam-=dt; t=1-Math.max(0,G.introCam)/1.3; t=t*t*(3-2*t); }
+      const introFov=38;
+      G.introCam-=dt; let t=1-Math.max(0,G.introCam)/1.3; t=t*t*(3-2*t);
       camera.position.lerpVectors(introPos, drivePos, t);
       camera.lookAt(new T.Vector3().lerpVectors(introLook, driveLook, t));
       camera.fov=introFov+(driveFov-introFov)*t;
