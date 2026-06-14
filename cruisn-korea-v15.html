@@ -1268,9 +1268,9 @@ function hitPlayer(){            // 라이벌 아이템에 맞음 → 스핀(전
 // ---------- 코스 캠페인 ----------
 // time=시작 제한시간, ck=체크포인트 보너스(구간 소요≈26~30s 기준), lap=랩 보너스
 const COURSES=[
-  {map:'suburb', name:'COURSE 1 · SUNNY SUBURB', diff:1.00, time:32, ck:44, lap:12},
-  {map:'city',   name:'COURSE 2 · NEON CITY',    diff:1.08, time:28, ck:40, lap:10},
-  {map:'beach',  name:'COURSE 3 · STORMY BEACH', diff:1.16, time:24, ck:36, lap:8},
+  {map:'suburb', name:'COURSE 1 · SUNNY SUBURB', diff:1.00, time:52, ck:44, lap:12},
+  {map:'city',   name:'COURSE 2 · NEON CITY',    diff:1.08, time:48, ck:40, lap:10},
+  {map:'beach',  name:'COURSE 3 · STORMY BEACH', diff:1.16, time:44, ck:36, lap:8},
 ];
 const TOTAL_LAPS=3;
 let unlockedCourse=1;          // 클리어로 해금된 최고 코스 (게임오버해도 유지)
@@ -1597,7 +1597,7 @@ function say(text, priority){
     if(speechSynthesis.paused) speechSynthesis.resume();
     const u=new SpeechSynthesisUtterance(text);
     u.lang='ko-KR'; u.voice=(typeof CASTER_VOICE!=='undefined'&&CASTER_VOICE)||TTS.voice||null;
-    u.rate=1.08; u.pitch=1.04; u.volume=1.0;   // 자연스러운 캐스터 톤
+    u.rate=1.12; u.pitch=1.12; u.volume=1.0;   // 들뜬 여성 캐스터 톤
     speechSynthesis.speak(u);
   }catch(e){}
 }
@@ -1832,7 +1832,7 @@ function assignVoices(){
   const pickFrom=(arr,i)=> arr.length? arr[i%arr.length] : ko[i%ko.length];
   DRIVER_VOICE=[];
   for(let d=0; d<8; d++){ DRIVER_VOICE[d] = DRIVER_GENDER[d]==='M'? pickFrom(male,d) : pickFrom(female,d); }
-  CASTER_VOICE = male[0] || ko[ko.length>1?1:0] || ko[0];   // 중계는 라이벌과 살짝 다르게
+  CASTER_VOICE = female[0] || ko[0];   // 중계는 여성 목소리
 }
 function loadVoices(){ try{_voices=speechSynthesis.getVoices()||[];}catch(e){_voices=[];} assignVoices(); }
 if('speechSynthesis' in window){ loadVoices(); try{speechSynthesis.addEventListener('voiceschanged',loadVoices);}catch(e){} }
@@ -2158,7 +2158,7 @@ function loop(now){
           r.itemT-=dt;
           if(r.itemT<=0){ r.itemT=7+Math.random()*6;
             const d=rivalTotal(r)-playerTotal();
-            if(Math.abs(d)<175 && G.star<=0 && !shrunk){
+            if(Math.abs(d)<175 && G.star<=0 && !shrunk && Math.random()<0.6){   // 60%만 사용
               if(d<0) spawnMissile(r.s+4, r.lat, true, null, 'rival');   // 뒤 → 유도 미사일
               else spawnBanana(r.s-6, r.lat, 'rival');                   // 앞 → 바나나 투하
               if(Math.random()<.5) rivalSay(r,'taunt');
