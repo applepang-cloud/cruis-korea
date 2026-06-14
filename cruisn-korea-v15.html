@@ -1292,9 +1292,10 @@ function spawnMissile(s,lat,homing,target,owner){
   projectiles.push({s,lat,spd:150,homing:!!homing,target:target||null,mesh:m,dist:0,t:0,owner:owner||'player'});
 }
 function hitRival(r){ r.spin=Math.max(r.spin||0,2.2); r.spd=0; }
+function crushRival(r){ r.spin=Math.max(r.spin||0,1.6); r.crushed=1.6; r.spd=0; beep(120,.18,'square',.22); }  // 작은 차 찌그러짐
 function hitPlayer(){            // 라이벌 아이템에 맞음 → 스핀(전복 아님)
   if(G.star>0||G.rollT>0||G.spinT>0||G.mode!=='race') return;
-  G.spinT=G.spinDur=1.3; G.spd*=0.35; G.shakeT=.5;
+  G.spinT=G.spinDur=1.3; G.spd*=0.35; G.shakeT=.5; G.slowAccelT=2.0;
   beep(140,.3,'sawtooth',.3); flashScreen('#ffaa22',.25); playerSay('shock');
 }
 
@@ -1324,6 +1325,7 @@ const G={
   airT:0, airDur:0, airY:0, // 점프
   rollT:0, rollDur:0,    // 강한 충돌 롤아웃(구르기)
   spinT:0, spinDur:0,    // 아이템 피격 스핀(전복 아님)
+  slowAccelT:0,          // 충돌 후 천천히 가속
   tauntT:6,              // 라이벌 도발 타이머
   playerDriver:0,
   timeScale:1, cine:null,// 슬로우모션 연출
@@ -1727,7 +1729,7 @@ function startCourse(courseNum){
   THEME=THEMES[co.map]; buildScenery();
   G.mode='countdown'; G.s=0; G.lat=0; G.spd=0; G.time=co.time; G.nextCk=0; G.lap=1; G.introCam=0;
   G.countdown=4.4; G.tauntT=6;
-  rivals.forEach((r,i)=>{ r.s=-8-i*7; r.spd=0; r.lap=1; r.base=49+i*0.5+Math.random()*1.5; r.itemT=5+Math.random()*5; r.spin=0; r.shrink=0; });
+  rivals.forEach((r,i)=>{ r.s=-8-i*7; r.spd=0; r.lap=1; r.base=49+i*0.5+Math.random()*1.5; r.itemT=5+Math.random()*5; r.spin=0; r.shrink=0; r.crushed=0; r.slowAccelT=0; r.mesh.scale.set(1,1,1); });
   resetRaceObjects();
   selEl.classList.remove('on'); titleEl.style.display='none'; carselEl.classList.remove('on');
   ui.result.classList.remove('on');
@@ -1845,7 +1847,7 @@ function thunderSound(){ if(!AC||muted)return; const o=AC.createOscillator(),g=A
   g.gain.setValueAtTime(.0001,AC.currentTime); g.gain.linearRampToValueAtTime(.4,AC.currentTime+.04); g.gain.exponentialRampToValueAtTime(.001,AC.currentTime+1.1);
   o.connect(g); g.connect(AC.destination); o.start(); o.stop(AC.currentTime+1.2); }
 function startRollout(){
-  G.rollT=G.rollDur=1.8; G.spd*=0.3; G.crashT=2.0; G.shakeT=.9;
+  G.rollT=G.rollDur=1.8; G.spd*=0.3; G.crashT=2.0; G.shakeT=.9; G.slowAccelT=2.5;
   startCine('crash',1.5);          // 슬로우모션 줌
   msg('CRASH! 💥','#ff3322'); beep(80,.5,'sawtooth',.45); thunderSound(); flashScreen('#ff2a1a',.45);
   playerSay('shock'); say('크게 부딪혔습니다!',true);
@@ -1937,6 +1939,7 @@ function useItem(slot){
 }
 function resetRaceObjects(){
   G.items=[null,null]; G.star=0; G.boost=0; G.airT=0; G.airDur=0; G.airY=0;
+  G.rollT=0; G.spinT=0; G.slowAccelT=0;
   G.playerDriver=CAR_DRIVER[G.car.key]||0;
   for(const b of bananas) scene.remove(b.mesh); bananas.length=0;
   for(const p of projectiles) scene.remove(p.mesh); projectiles.length=0;
@@ -2091,7 +2094,8 @@ function loop(now){
     let cap = (offRoad&&!invinc? MAXSPD*.45*car.grip : MAXSPD) * car.maxMul;
     if(boosting) cap*=1.6;
     if(grade<-.015) cap*=1.15;              // 내리막 오버스피드 허용
-    const acc=car.accel*(boosting?3:1);
+    let acc=car.accel*(boosting?3:1);
+    if(!disabled && G.slowAccelT>0){ G.slowAccelT-=dt; acc*=0.35; }   // 충돌 후 천천히 가속
     if(disabled){ G.spd -= (rolling?120:70)*dt; }            // 전복/스핀 중 감속
     else if(racing&&input.G) G.spd += (G.spd<cap? acc*dt : -22*dt);
     else if(racing&&input.B&&!boosting) G.spd -= 60*dt;
@@ -2128,7 +2132,7 @@ function loop(now){
         if(invinc){ t.s=200; G.shakeT=.15; beep(320,.08); }          // 무적: 튕겨냄
         else if(headOn && G.crashT<=0 && G.spd>ROLL_SPD){ startRollout(); }   // 200km/h↑ 정면만 전복
         else if(headOn && G.crashT<=0 && G.spd>t.spd+1){             // 정면 반동(전복 X)
-          G.spd*=0.55; G.crashT=0.7; G.shakeT=.4; G.lat += (G.lat>=t.lat?1:-1)*1.6;
+          G.spd*=0.55; G.crashT=0.7; G.shakeT=.4; G.slowAccelT=1.5; G.lat += (G.lat>=t.lat?1:-1)*1.6;
           msg('BUMP!','#ffcf47'); beep(150,.18,'sawtooth',.22); flashScreen('#ff7744',.18);
         } else if(!headOn && G.spd>t.spd){                           // 측면 → 트래픽 밀어냄
           const dir=dlat>=0?1:-1; t.lat += dir*8*dt; G.lat -= dir*4*dt; G.spd*=(1-0.35*dt);
@@ -2141,9 +2145,10 @@ function loop(now){
       if((r.spin||0)>0) continue;
       const ds=r.s-G.s, dlat=r.lat-G.lat, headOn=Math.abs(dlat)<0.9;
       if(ds>-3.2 && ds<4 && Math.abs(dlat)<2.6){
+        if((r.shrink||0)>0){ crushRival(r); continue; }   // 작아진 차만 찌그러짐 (나는 멀쩡)
         if(invinc){ if(G.crashT<=0){ hitRival(r); rivalSay(r,'shock'); G.crashT=.3; G.shakeT=.2; beep(320,.1); } }
         else if(headOn && G.crashT<=0 && G.spd>ROLL_SPD){ startRollout(); hitRival(r); }  // 200km/h↑ 정면만 전복
-        else if(headOn && G.crashT<=0){ G.spd*=0.6; G.crashT=0.55; G.shakeT=.35; G.lat += (G.lat>=r.lat?1:-1)*1.4; hitRival(r); beep(160,.14,'sawtooth',.2); }  // 정면 반동
+        else if(headOn && G.crashT<=0){ G.spd*=0.6; G.crashT=0.55; G.shakeT=.35; G.slowAccelT=1.5; G.lat += (G.lat>=r.lat?1:-1)*1.4; hitRival(r); beep(160,.14,'sawtooth',.2); }  // 정면 반동
         else { // 측면 → 서로 밀침
           const dir=dlat>=0?1:-1;
           G.lat -= dir*9*dt; r.lat += dir*11*dt;
@@ -2163,7 +2168,7 @@ function loop(now){
     // 건물 충돌 (도로 밖) — 건물 부서지고 속도 감소
     if(offRoad){ for(const b of buildings){ if(b.broken) continue;
       if(Math.abs(b.s-G.s)<7 && Math.abs(b.lat-G.lat)<b.r){
-        b.broken=true; b.mesh.visible=false; G.spd*=0.5; G.shakeT=.5;
+        b.broken=true; b.mesh.visible=false; G.spd*=0.5; G.shakeT=.5; G.slowAccelT=2.0;
         flashScreen('#caa15a',.3); beep(90,.3,'sawtooth',.3); msg('BUILDING DOWN!','#ff7744'); thunderSound(); playerSay('shock'); break;
       }
     }}
@@ -2183,12 +2188,16 @@ function loop(now){
       if(racing){
         if((r.spin||0)>0){
           r.spin-=dt; r.spd=0;            // 회전하며 정지
+          if((r.crushed||0)>0) r.crushed-=dt;
+          if(r.spin<=0) r.slowAccelT=2.0; // 회복 후 천천히 가속
         } else {
-          if((r.shrink||0)>0){ r.shrink-=dt; if(r.shrink<=0) r.mesh.scale.set(1,1,1); }
+          if((r.shrink||0)>0) r.shrink-=dt;
           const shrunk=(r.shrink||0)>0;
+          if((r.slowAccelT||0)>0) r.slowAccelT-=dt;
+          const ramp=(r.slowAccelT||0)>0? 0.3 : 0.9;   // 충돌 후 저가속
           const gap=playerTotal()-rivalTotal(r);
           let target=(r.base*G.diff)*(shrunk?0.45:1) + Math.max(-8,Math.min(9, gap*.025));
-          r.spd = r.spd + (target-r.spd)*dt*.9;
+          r.spd = r.spd + (target-r.spd)*dt*ramp;
           r.spd -= slope(r.s)*18*dt;
           r.s += Math.max(0,r.spd)*dt;
           if(r.s>=FINISH_S){ if(r.lap<TOTAL_LAPS){ r.s-=FINISH_S; r.lap++; } else { r.s=FINISH_S; } }
@@ -2196,15 +2205,14 @@ function loop(now){
           let wish = Math.sin(r.wob)*3.2;
           for(const t of traffic){ const ds=t.s-r.s; if(ds>0&&ds<26&&Math.abs(t.lat-r.lat)<2.4) wish = t.lat>0? -3.6:3.6; }
           r.lat += (wish-r.lat)*dt*1.4;
-          if(shrunk){ r.mesh.scale.set(.4,.4,.4);
-            for(const t of traffic){ if(Math.abs(t.s-r.s)<3&&Math.abs(t.lat-r.lat)<2){ hitRival(r); break; } } }  // 작을 때 일반차에 밟힘
-          // 라이벌 아이템 공격 (가까울 때)
+          if(shrunk){ for(const t of traffic){ if(Math.abs(t.s-r.s)<3&&Math.abs(t.lat-r.lat)<2){ crushRival(r); break; } } }  // 작을 때 일반차에 밟혀 찌그러짐
+          // 라이벌 아이템 공격 (가까울 때, 60%)
           r.itemT-=dt;
           if(r.itemT<=0){ r.itemT=7+Math.random()*6;
             const d=rivalTotal(r)-playerTotal();
-            if(Math.abs(d)<175 && G.star<=0 && !shrunk && Math.random()<0.6){   // 60%만 사용
-              if(d<0) spawnMissile(r.s+4, r.lat, true, null, 'rival');   // 뒤 → 유도 미사일
-              else spawnBanana(r.s-6, r.lat, 'rival');                   // 앞 → 바나나 투하
+            if(Math.abs(d)<175 && G.star<=0 && !shrunk && Math.random()<0.6){
+              if(d<0) spawnMissile(r.s+4, r.lat, true, null, 'rival');
+              else spawnBanana(r.s-6, r.lat, 'rival');
               if(Math.random()<.5) rivalSay(r,'taunt');
             }
           }
@@ -2212,6 +2220,10 @@ function loop(now){
       }
       const rp2=place(r.mesh, Math.max(r.s,0), r.lat, 0);
       if((r.spin||0)>0){ const turns=(2.2-r.spin)/2.2*3; r.mesh.rotation.y = -rp2.h + turns*Math.PI*2; }
+      // 스케일: 찌그러짐 > 축소 > 정상
+      if((r.crushed||0)>0) r.mesh.scale.set(0.6,0.12,0.7);
+      else if((r.shrink||0)>0) r.mesh.scale.set(0.4,0.4,0.4);
+      else r.mesh.scale.set(1,1,1);
     }
 
     // --- 아이템 박스/바나나/미사일 + 얼굴 말풍선 타이머 ---
@@ -2247,7 +2259,7 @@ function loop(now){
       const _co=COURSES[G.course-1];
       if(G.nextCk<checkpoints.length && G.s>checkpoints[G.nextCk].s){
         const cp=checkpoints[G.nextCk]; G.nextCk++; G.time+=_co.ck;
-        if(cp.arch){ msg('CHECK POINT! +'+_co.ck,'#7df1ff'); beep(988,.12);setTimeout(()=>beep(1318,.18),110); say(pick(SAY.checkpoint)); startCine('checkpoint',1.0); }
+        if(cp.arch){ msg('+'+_co.ck,'#7dff7d'); beep(988,.1); }   // 카메라 연출 없이 +시간만
         else beep(900,.05,'square',.08);
       }
       // 랩 통과 / 코스 완주
