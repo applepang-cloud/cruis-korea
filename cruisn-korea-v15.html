@@ -280,9 +280,9 @@ const THEMES={
   suburb:{ name:'SUNNY SUBURB', sky:0x6fb7ff, fog:0x9fd2ff, fogN:220, fogF:950,
     sun:0xffffff, sunI:1.0, amb:0xbfd4ff, ambI:.75, ground:0x4fae47,
     mountain:true, clouds:true, palms:true, houses:true, scene:'suburb', rain:false },
-  city:{ name:'NEON CITY · NIGHT', sky:0x0a0a1e, fog:0x141430, fogN:160, fogF:780,
-    sun:0x6677cc, sunI:.35, amb:0x3a3a66, ambI:.55, ground:0x14141f,
-    mountain:false, clouds:false, palms:false, houses:false, scene:'city', rain:false },
+  city:{ name:'NEON CITY · NIGHT', sky:0x162148, fog:0x223057, fogN:180, fogF:900,
+    sun:0x9fb0ff, sunI:.7, amb:0x6b73a0, ambI:1.0, ground:0x26283a,
+    mountain:false, clouds:false, palms:true, houses:false, scene:'city', rain:false },
   beach:{ name:'STORMY BEACH', sky:0x3a4452, fog:0x4a5562, fogN:120, fogF:620,
     sun:0x99a3b5, sunI:.4, amb:0x556070, ambI:.6, ground:0xc9b487,
     mountain:false, clouds:true, palms:true, houses:false, scene:'beach', rain:true }
@@ -568,9 +568,10 @@ function building(){
 }
 function streetlight(){
   const g=new T.Group();
-  g.add(new T.Mesh(new T.CylinderGeometry(.18,.22,7,5),new T.MeshLambertMaterial({color:0x222230})).translateY(3.5));
-  const lamp=new T.Mesh(new T.SphereGeometry(.5,6,5),new T.MeshBasicMaterial({color:0xffeec0}));
-  lamp.position.set(0,7,0); g.add(lamp);
+  g.add(new T.Mesh(new T.CylinderGeometry(.18,.22,7,5),new T.MeshLambertMaterial({color:0x33333f})).translateY(3.5));
+  const arm=new T.Mesh(new T.BoxGeometry(.12,.12,1.4),new T.MeshLambertMaterial({color:0x33333f})); arm.position.set(0,7,0.7); g.add(arm);
+  const lamp=new T.Mesh(new T.SphereGeometry(.5,8,6),new T.MeshBasicMaterial({color:0xfff0c4})); lamp.position.set(0,6.9,1.3); g.add(lamp);
+  const glow=new T.Mesh(new T.SphereGeometry(1.1,8,6),new T.MeshBasicMaterial({color:0xffe7a0,transparent:true,opacity:0.28,depthWrite:false,fog:false})); glow.position.set(0,6.9,1.3); g.add(glow);
   return g;
 }
 // 활엽수
@@ -821,7 +822,7 @@ function buildScenery(){
       buildings.push({s,lat,mesh:b,r:7});
     }
     // 가로등 (도로 양쪽)
-    for(let s=40;s<TRACK_LEN-100;s+=44){
+    for(let s=40;s<TRACK_LEN-100;s+=28){
       const sd=(Math.floor(s/34)%2)?1:-1, lat=sd*(ROAD_W/2+2);
       const sl=streetlight(); const p=place(sl,s,lat);
       sl.position.y=groundY(p,lat); sl.rotation.x=0; addS(sl);
@@ -1453,7 +1454,7 @@ const G={
   msgT:0, crashT:0, shakeT:0,
   startT:0, countdown:0,
   car:CARS[0],           // 선택된 차량
-  course:1, lap:1, diff:1, introCam:0,
+  course:1, lap:1, diff:1, introCam:0, finishedCount:0,
   items:[null,null],     // Z슬롯, X슬롯
   star:0, boost:0,       // 무적/부스트 남은 시간
   airT:0, airDur:0, airY:0, // 점프
@@ -1858,8 +1859,8 @@ function startCourse(courseNum){
   G.diff=co.diff; TOTAL_LAPS=co.laps;
   THEME=THEMES[co.map]; buildScenery();
   G.mode='countdown'; G.s=0; G.lat=0; G.spd=0; G.time=co.time; G.nextCk=0; G.lap=1; G.introCam=0;
-  G.countdown=4.4; G.tauntT=6;
-  rivals.forEach((r,i)=>{ r.s=-8-i*7; r.spd=0; r.lap=1; r.base=54+i*0.5+Math.random()*1.5; r.itemT=5+Math.random()*5; r.spin=0; r.shrink=0; r.crushed=0; r.slowAccelT=0; r.mesh.scale.set(1,1,1); });
+  G.countdown=4.4; G.tauntT=6; G.finishedCount=0;
+  rivals.forEach((r,i)=>{ r.s=-8-i*7; r.spd=0; r.lap=1; r.base=54+i*0.5+Math.random()*1.5; r.itemT=5+Math.random()*5; r.spin=0; r.shrink=0; r.crushed=0; r.slowAccelT=0; r.finished=false; r.mesh.scale.set(1,1,1); });
   resetRaceObjects();
   selEl.classList.remove('on'); titleEl.style.display='none'; carselEl.classList.remove('on');
   ui.result.classList.remove('on');
@@ -1913,7 +1914,7 @@ $('res-btn').addEventListener('click',()=>{
 });
 
 function finishCourse(){
-  const ahead=aheadCount(), rank=ahead+1;
+  const ahead=G.finishedCount, rank=ahead+1;   // 먼저 골인한 라이벌 수 = 내 앞 순위
   G.mode='over'; ui.hud.classList.remove('on'); fadeMusic(); skidSound(false);
   $('mirror-frame').classList.remove('on'); $('minimap').classList.remove('on');
   $('speedfx').classList.remove('on'); $('vignette').style.opacity=0; $('bluredge').style.opacity=0;
@@ -2454,7 +2455,7 @@ function loop(now){
           r.spd = r.spd + (target-r.spd)*dt*ramp;
           r.spd -= slope(r.s)*18*dt;
           r.s += Math.max(0,r.spd)*dt;
-          if(r.s>=FINISH_S){ if(r.lap<TOTAL_LAPS){ r.s-=FINISH_S; r.lap++; } else { r.s=FINISH_S; } }
+          if(r.s>=FINISH_S){ if(r.lap<TOTAL_LAPS){ r.s-=FINISH_S; r.lap++; } else { r.s=FINISH_S; if(!r.finished){ r.finished=true; G.finishedCount++; } } }
           r.wob+=dt*.7;
           let wish = Math.sin(r.wob)*3.2;
           for(const t of traffic){ const ds=t.s-r.s; if(ds>0&&ds<26&&Math.abs(t.lat-r.lat)<2.4) wish = t.lat>0? -3.6:3.6; }
