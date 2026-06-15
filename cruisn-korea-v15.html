@@ -2251,16 +2251,21 @@ const VOICE_MANIFEST=[], LINE_FILE={};
   CROWD_LINES.forEach((t,i)=>add('군중','길가 사람들',t,'crowd_'+(i+1)+'.mp3'));
   add('조커','조커(UFO)',JOKER_LINE,'joker_1.mp3');
 })();
-const VOICE_DIR='voice/', _voiceAudio={};
+const VOICE_DIR='voice/', _voiceAudio={}, _voiceMissing={};
 function playVoice(text, ttsFn, fileOverride){   // mp3 파일이 있으면 mp3, 없으면 TTS
   if(muted) return;
   const file=fileOverride || LINE_FILE[text];
-  if(!file || _voiceAudio[file]===false){ if(ttsFn)ttsFn(); return; }
+  if(!file || _voiceMissing[file]){ if(ttsFn)ttsFn(); return; }   // 로드 실패로 확인된 파일만 TTS
   let a=_voiceAudio[file];
-  if(!a){ a=new Audio(VOICE_DIR+file); a.volume=1; _voiceAudio[file]=a; }
-  try{ a.currentTime=0; }catch(e){}
+  if(!a){ a=new Audio(VOICE_DIR+file); a.volume=1; _voiceAudio[file]=a;
+    a.addEventListener('error',()=>{ _voiceMissing[file]=true; });   // 진짜 파일 없음/로드 실패
+  }
+  try{ a.pause(); a.currentTime=0; }catch(e){}   // 재생 중이어도 처음부터 다시
   const pr=a.play();
-  if(pr&&pr.catch) pr.catch(()=>{ _voiceAudio[file]=false; if(ttsFn)ttsFn(); });   // 파일 없으면 TTS
+  if(pr&&pr.catch) pr.catch(()=>{
+    // a.error 있으면 로드 실패(파일 없음)→TTS. 없으면 일시적 재생중단(AbortError)→무시(다음에 정상 재생)
+    if(a.error){ _voiceMissing[file]=true; if(ttsFn)ttsFn(); }
+  });
 }
 
 // ====== 아이템 슬롯 / 사용 ======
