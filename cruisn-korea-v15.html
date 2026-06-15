@@ -25,6 +25,11 @@
   #flash{position:fixed;inset:0;z-index:18;pointer-events:none;opacity:0;background:#fff;mix-blend-mode:screen}
   #flash.rainbow{background:linear-gradient(120deg,#ff0055,#ffd200,#00e1ff,#a64dff,#ff0055);background-size:300% 300%;animation:rbshift .6s linear infinite}
   @keyframes rbshift{0%{background-position:0% 50%}100%{background-position:300% 50%}}
+  #mirror-frame{position:fixed;top:10px;left:50%;transform:translateX(-50%);width:30vw;height:12vh;border:3px solid #ffffffcc;border-radius:8px;box-shadow:0 2px 10px #000a, inset 0 0 0 2px #0006;pointer-events:none;z-index:11;display:none}
+  #mirror-frame.on{display:block}
+  #mirror-frame::before{content:'▲ REAR';position:absolute;top:-2px;left:6px;color:#fff;font:900 9px sans-serif;text-shadow:1px 1px 0 #000}
+  #minimap{position:fixed;right:10px;top:50%;transform:translateY(-50%);z-index:11;background:rgba(8,12,30,.55);border:2px solid #ffffff55;border-radius:8px;display:none}
+  #minimap.on{display:block}
   #replay{position:fixed;left:20px;top:16px;z-index:24;display:none;color:#fff;font:900 italic clamp(18px,4vw,32px) "Arial Black",Arial;text-shadow:2px 2px 0 #000,0 0 10px #000;letter-spacing:1px}
   #replay.on{display:block}
   #replay .rec{color:#ff2a2a;animation:blink 1s steps(1) infinite}
@@ -139,6 +144,8 @@
 <div id="flash"></div>
 <div id="bigicon"></div>
 <div id="replay"><span class="rec">●</span> REPLAY</div>
+<div id="mirror-frame"></div>
+<canvas id="minimap" width="92" height="330"></canvas>
 <div id="ver" style="position:fixed;bottom:4px;right:6px;z-index:40;color:#ffffff66;font:700 10px monospace;pointer-events:none">v15</div>
 <div id="tts-badge" style="position:fixed;bottom:4px;left:6px;z-index:40;color:#ffffff66;font:700 11px monospace;pointer-events:none"></div>
 <button id="newtab" style="position:fixed;bottom:54px;left:50%;transform:translateX(-50%);z-index:40;display:none;pointer-events:auto;background:rgba(255,215,34,.92);color:#222;border:none;border-radius:16px;padding:5px 14px;font:900 11px sans-serif;cursor:pointer;white-space:nowrap;box-shadow:0 2px 8px #0006">🔊 새 탭에서 열면 음성 ON</button>
@@ -246,6 +253,8 @@ scene.fog = new T.Fog(0x9fd2ff, 220, 950);
 
 const camera = new T.PerspectiveCamera(72, innerWidth/innerHeight, .5, 2200);
 scene.add(camera);
+const mirrorCam = new T.PerspectiveCamera(80, 2.5, .5, 1400);   // 백미러(후방)
+scene.add(mirrorCam);
 
 const sun = new T.DirectionalLight(0xffffff, 1.0);
 sun.position.set(-300, 500, -200);
@@ -1057,6 +1066,11 @@ function buildCarMesh(spec){
   // 글래스 캐노피 (윈드실드+사이드+리어)
   const cab=new T.Mesh(new T.BoxGeometry(W*0.84, cabH*0.9, cabL*0.92),GLASS_MAT);
   cab.position.set(0, bodyY+bodyH/2+cabH*0.45, cabZ); g.add(cab);
+  // 내 차 식별: 흰 레이싱 스트라이프 2줄 + 루프 엠블럼
+  const white=new T.MeshBasicMaterial({color:0xffffff});
+  for(const sx of [-0.34,0.34]){ const st=new T.Mesh(new T.BoxGeometry(0.26,0.04,L*0.86),white); st.position.set(sx, bodyY+bodyH/2+0.03, 0); g.add(st); }
+  const emblem=new T.Mesh(new T.CircleGeometry(0.42,5),new T.MeshBasicMaterial({color:0xffd722,side:T.DoubleSide}));
+  emblem.rotation.x=-Math.PI/2; emblem.rotation.z=Math.PI/10; emblem.position.set(0, bodyY+bodyH/2+cabH+0.04, cabZ); g.add(emblem);
   // A/C 필러(기둥)
   for(const sx of [-1,1]){
     const pil=new T.Mesh(new T.BoxGeometry(.08,cabH*0.95,.1),bodyMat);
@@ -1233,7 +1247,7 @@ const RIVAL_COLORS=[0x2b46e0,0xf2c50f,0x18a85a,0xd96bd0,0xff7a1a,0x35c9d8,0x8e44
 const rivals = RIVAL_COLORS.map((c,i)=>({
   mesh:(()=>{const m=makeCar(c,true);scene.add(m);return m;})(),
   s: -8 - i*7, lat:(i%2? 2.6:-2.6)+(Math.random()-.5),
-  base: 49 + i*0.5 + Math.random()*1.5, // m/s — 주인공과 동일 속도
+  base: 54 + i*0.5 + Math.random()*1.5, // m/s — 주인공급(독주 방지)
   wob: Math.random()*6.28, lap:1, driver:i, itemT:5+Math.random()*5   // itemT: 아이템 공격 타이머
 }));
 rivals.forEach(r=>{ const sp=makeRankSprite(); r.mesh.userData.rankSprite=sp; r.mesh.add(sp); });
@@ -1773,11 +1787,12 @@ function startCourse(courseNum){
   THEME=THEMES[co.map]; buildScenery();
   G.mode='countdown'; G.s=0; G.lat=0; G.spd=0; G.time=co.time; G.nextCk=0; G.lap=1; G.introCam=0;
   G.countdown=4.4; G.tauntT=6;
-  rivals.forEach((r,i)=>{ r.s=-8-i*7; r.spd=0; r.lap=1; r.base=49+i*0.5+Math.random()*1.5; r.itemT=5+Math.random()*5; r.spin=0; r.shrink=0; r.crushed=0; r.slowAccelT=0; r.mesh.scale.set(1,1,1); });
+  rivals.forEach((r,i)=>{ r.s=-8-i*7; r.spd=0; r.lap=1; r.base=54+i*0.5+Math.random()*1.5; r.itemT=5+Math.random()*5; r.spin=0; r.shrink=0; r.crushed=0; r.slowAccelT=0; r.mesh.scale.set(1,1,1); });
   resetRaceObjects();
   selEl.classList.remove('on'); titleEl.style.display='none'; carselEl.classList.remove('on');
   ui.result.classList.remove('on');
   ui.hud.classList.add('on'); $('pads').classList.add('on');
+  $('mirror-frame').classList.add('on'); $('minimap').classList.add('on');
   startMusic(THEME.scene);
   raceGirl.visible=true;
   girlState.active=true; girlState.t=0; girlState.phase='idle'; girlState.lat=4.2; girlState.s=14;
@@ -1828,6 +1843,7 @@ $('res-btn').addEventListener('click',()=>{
 function finishCourse(){
   const ahead=aheadCount(), rank=ahead+1;
   G.mode='over'; ui.hud.classList.remove('on'); fadeMusic(); skidSound(false);
+  $('mirror-frame').classList.remove('on'); $('minimap').classList.remove('on');
   if(eng)eng.master.gain.setTargetAtTime(0,AC?AC.currentTime:0,0.1);
   if(rank<=3){
     if(G.course>=3){
@@ -1855,6 +1871,7 @@ function finishCourse(){
 }
 function failTimeout(){
   G.mode='over'; ui.hud.classList.remove('on'); fadeMusic(); skidSound(false);
+  $('mirror-frame').classList.remove('on'); $('minimap').classList.remove('on');
   if(eng)eng.master.gain.setTargetAtTime(0,AC?AC.currentTime:0,0.1);
   ui.resBig.textContent='TIME UP';
   ui.resSub.innerHTML='시간 초과!<br>코스 '+G.course+' 다시 도전!';
@@ -2113,13 +2130,43 @@ function updateCrosswalks(dtt){
       cr.mesh.position.set(p.x+Math.cos(p.h)*cr.lat, groundY(p,cr.lat), p.z+Math.sin(p.h)*cr.lat);
       cr.mesh.rotation.set(0, -p.h + (dl>=0?-Math.PI/2:Math.PI/2), 0);
       const pr=cr.mesh.userData.parts; if(!pr) continue;
-      if(cr.panic){ pr['arm1'].rotation.set(0,0,-2.5); pr['arm-1'].rotation.set(0,0,2.5);   // 두 팔 들고 놀람
+      if(cr.panic){ pr['arm1'].rotation.set(0,0,2.5); pr['arm-1'].rotation.set(0,0,-2.5);   // 두 팔 바깥으로 번쩍(놀람)
         cr.phase+=dtt*16; const sw=Math.sin(cr.phase)*0.7; pr['leg1'].rotation.x=sw; pr['leg-1'].rotation.x=-sw; }
       else if(cr.moving){ pr['arm1'].rotation.z=0.12; pr['arm-1'].rotation.z=-0.12;
         cr.phase+=dtt*6; const sw=Math.sin(cr.phase)*0.5; pr['leg1'].rotation.x=sw; pr['leg-1'].rotation.x=-sw; pr['arm1'].rotation.x=-sw; pr['arm-1'].rotation.x=sw; }
       else { pr['arm1'].rotation.set(0,0,0.12); pr['arm-1'].rotation.set(0,0,-0.12); pr['leg1'].rotation.x=0; pr['leg-1'].rotation.x=0; }
     }
   }
+}
+
+// 백미러 (후방 카메라를 상단 중앙 작은 뷰포트에 렌더)
+function renderMirror(){
+  const W=innerWidth, H=innerHeight, mw=W*0.30, mh=H*0.12, mx=(W-mw)/2, my=H-mh-10;
+  const mp=sample(G.s), px=mp.x+Math.cos(mp.h)*G.lat, pz=mp.z+Math.sin(mp.h)*G.lat;
+  mirrorCam.position.set(px, mp.y+3.2, pz);
+  mirrorCam.lookAt(px - Math.sin(mp.h)*25, mp.y+1.6, pz + Math.cos(mp.h)*25);  // 후방
+  mirrorCam.aspect=mw/mh; mirrorCam.updateProjectionMatrix();
+  renderer.setScissorTest(true);
+  renderer.setViewport(mx,my,mw,mh); renderer.setScissor(mx,my,mw,mh);
+  renderer.render(scene, mirrorCam);
+  renderer.setScissorTest(false);
+  renderer.setViewport(0,0,W,H);
+}
+// 우측 미니맵 (내 차 vs 라이벌 거리)
+function drawMinimap(){
+  const cv=$('minimap'); if(!cv) return; const c=cv.getContext('2d'), W=cv.width, H=cv.height;
+  c.clearRect(0,0,W,H);
+  const cx=W/2, cy=H/2, RANGE=180, halfPx=H/2-16;
+  c.strokeStyle='#3a4a66'; c.lineWidth=10; c.lineCap='round'; c.beginPath(); c.moveTo(cx,14); c.lineTo(cx,H-14); c.stroke();
+  c.fillStyle='#9fb0d8'; c.font='bold 10px sans-serif'; c.textAlign='center'; c.fillText('▲', cx, 11);
+  const pt=playerTotal();
+  for(const r of rivals){ const gap=rivalTotal(r)-pt;
+    const y=cy - (Math.max(-RANGE,Math.min(RANGE,gap))/RANGE)*halfPx;
+    c.fillStyle='#ffd722'; c.beginPath(); c.arc(cx,y,5,0,6.3); c.fill();
+    if(Math.abs(gap)<RANGE){ c.fillStyle='#fff'; c.font='8px sans-serif'; c.textAlign='left'; c.fillText(Math.round(Math.abs(gap))+'m', cx+9, y+3); }
+  }
+  c.fillStyle='#ff3b30'; c.beginPath(); c.arc(cx,cy,7,0,6.3); c.fill();
+  c.strokeStyle='#fff'; c.lineWidth=2; c.stroke();
 }
 
 // ---------- 메인 루프 ----------
@@ -2145,8 +2192,8 @@ function loop(now){
     const arms=raceGirl.userData.arms;
     if(girlState.phase==='idle'){
       // 출발선에 서서 한 손 흔들기 (오른팔)
-      arms.R.rotation.z=-2.2 + Math.sin(girlState.t*7)*0.5; // 머리 위로 들고 흔듦
-      arms.L.rotation.z=0.3;
+      arms.R.rotation.set(0.1, 0, 2.3 + Math.sin(girlState.t*6)*0.35); // 오른팔 바깥쪽 위로 흔듦
+      arms.L.rotation.set(0, 0, -0.15);
       const p=place(raceGirl, girlState.s, girlState.lat, 0);
       raceGirl.position.y=groundY(p,girlState.lat);
       raceGirl.rotation.y=-p.h - Math.PI/2; // 도로(플레이어) 쪽을 바라봄
@@ -2155,8 +2202,8 @@ function loop(now){
       // 도로 밖으로 종종걸음 퇴장 + 점점 멀어짐
       girlState.lat += dt*9;            // 갓길 쪽으로
       girlState.s += dt*4;
-      arms.R.rotation.z=-0.6+Math.sin(girlState.t*12)*0.7; // 달리는 팔동작
-      arms.L.rotation.z= 0.6-Math.sin(girlState.t*12)*0.7;
+      const swA=Math.sin(girlState.t*12)*0.7;              // 달리는 팔동작(앞뒤 스윙)
+      arms.R.rotation.set(swA,0,-0.2); arms.L.rotation.set(-swA,0,0.2);
       const p=place(raceGirl, girlState.s, girlState.lat, 0);
       raceGirl.position.y=groundY(p,girlState.lat) + Math.abs(Math.sin(girlState.t*12))*0.12; // 통통 뛰기
       raceGirl.rotation.y=-p.h - Math.PI/2 + 0.6;
@@ -2280,7 +2327,7 @@ function loop(now){
           if((r.slowAccelT||0)>0) r.slowAccelT-=dt;
           const ramp=(r.slowAccelT||0)>0? 0.3 : 0.9;   // 충돌 후 저가속
           const gap=playerTotal()-rivalTotal(r);
-          let target=(r.base*G.diff)*(shrunk?0.45:1) + Math.max(-8,Math.min(9, gap*.025));
+          let target=(r.base*G.diff)*(shrunk?0.45:1) + Math.max(-8,Math.min(20, gap*.045));  // 뒤처지면 강하게 추격
           r.spd = r.spd + (target-r.spd)*dt*ramp;
           r.spd -= slope(r.s)*18*dt;
           r.s += Math.max(0,r.spd)*dt;
@@ -2448,7 +2495,7 @@ function loop(now){
         sp.material.map=rankTexture(i+1);
         sp.visible = !((o.r.spin||0)>0);   // 회전 중 숨김 (라이벌만)
         const d = camera.position.distanceTo(mesh.position);   // 가까이=작게, 멀리=크게
-        const sc = Math.max(1.2, Math.min(16, d*d*0.006));
+        const sc = Math.max(1.0, Math.min(12, d*d*0.0045));
         sp.scale.set(sc, sc, 1);
       } }
 
@@ -2460,6 +2507,7 @@ function loop(now){
     ui.rank.textContent = ORD[Math.min(ahead,7)];
     ui.dist.textContent = Math.max(0,Math.round((FINISH_S-G.s)/10)*10)+' m';
     ui.prog.style.width = Math.min(100, ((G.lap-1)+G.s/FINISH_S)/TOTAL_LAPS*100)+'%';
+    drawMinimap();
     if(G.msgT>0){G.msgT-=dt; if(G.msgT<=0)ui.msg.classList.remove('show');}
   }
 
@@ -2517,6 +2565,7 @@ function loop(now){
   } else if(dino.visible){ dino.visible=false; dinoState.active=false; }
 
   renderer.render(scene,camera);
+  if(G.mode==='race') renderMirror();   // 메인 렌더 후 백미러
 }
 requestAnimationFrame(loop);
 })();
