@@ -21,6 +21,12 @@
   #game{position:fixed;inset:0}
   canvas{display:block}
   /* 화면 플래시 / 큰 아이콘 연출 */
+  /* 고속 스피드 라인 + 주변 블러/비네팅 */
+  #bluredge{position:fixed;inset:0;z-index:7;pointer-events:none;opacity:0;backdrop-filter:blur(5px);-webkit-backdrop-filter:blur(5px);
+    -webkit-mask:radial-gradient(ellipse 62% 60% at 50% 46%, transparent 52%, #000 100%);mask:radial-gradient(ellipse 62% 60% at 50% 46%, transparent 52%, #000 100%)}
+  #vignette{position:fixed;inset:0;z-index:8;pointer-events:none;opacity:0;background:radial-gradient(ellipse 70% 65% at 50% 46%, transparent 48%, rgba(0,0,0,.7) 100%)}
+  #speedfx{position:fixed;inset:0;z-index:9;pointer-events:none;display:none}
+  #speedfx.on{display:block}
   #dark{position:fixed;inset:0;z-index:17;pointer-events:none;opacity:0;background:#050510}
   #flash{position:fixed;inset:0;z-index:18;pointer-events:none;opacity:0;background:#fff;mix-blend-mode:screen}
   #flash.rainbow{background:linear-gradient(120deg,#ff0055,#ffd200,#00e1ff,#a64dff,#ff0055);background-size:300% 300%;animation:rbshift .6s linear infinite}
@@ -51,7 +57,7 @@
   #hud-rank{position:fixed;right:18px;top:12px;text-align:right;z-index:12}
   #hud-rank .big{font-size:clamp(34px,7vw,62px);color:#7df1ff}
   #hud-rank .small{font-size:clamp(12px,2.2vw,18px);color:#fff}
-  #hud-lap{position:fixed;left:50%;top:84px;transform:translateX(-50%);font-size:clamp(20px,4vw,40px);color:#7dff7d;text-align:center}
+  #hud-lap{position:fixed;left:calc(50% - 95px);top:calc(12vh + 34px);transform:translateX(-100%);font-size:clamp(18px,3.4vw,34px);color:#7dff7d;text-align:right;line-height:1}
   #hud-course{position:fixed;left:18px;top:14px;font-size:clamp(12px,2.4vw,20px);color:#ffd722}
   /* 아이템 슬롯 */
   #hud-items{position:fixed;left:50%;bottom:14px;transform:translateX(-50%);display:flex;gap:12px}
@@ -140,6 +146,9 @@
 </head>
 <body>
 <div id="game"></div>
+<div id="bluredge"></div>
+<div id="vignette"></div>
+<canvas id="speedfx"></canvas>
 <div id="dark"></div>
 <div id="flash"></div>
 <div id="bigicon"></div>
@@ -279,6 +288,7 @@ addEventListener('resize',()=>{
   camera.aspect = innerWidth/innerHeight;
   camera.updateProjectionMatrix();
   renderer.setSize(innerWidth,innerHeight);
+  if(typeof sizeSpeedFX==='function') sizeSpeedFX();
 });
 
 // ---------- 트랙(센터라인) 생성 ----------
@@ -793,7 +803,8 @@ function buildScenery(){
     // 활엽수도 추가
     for(let s=120; s<TRACK_LEN-200; s+=40){
       if(Math.random()<.6){ const side=Math.random()<.5?-1:1, lat=side*(ROAD_W/2+5+Math.random()*16);
-        const tr=tree(); const p=place(tr,s,lat); tr.position.y=groundY(p,lat); tr.rotation.x=0; tr.rotation.y=Math.random()*6.3; addS(tr); }
+        const tr=tree(); const p=place(tr,s,lat); tr.position.y=groundY(p,lat); tr.rotation.x=0; tr.rotation.y=Math.random()*6.3; addS(tr);
+        if(Math.abs(lat)<ROAD_W/2+9) obstacles.push({s,lat,mesh:tr,r:1.3,kind:'tree'}); }   // 도로 가까운 나무는 파괴 가능
     }
   }
   if(th.scene==='city'){
@@ -1355,6 +1366,17 @@ function spawnSmoke(x,y,z){ const m=new T.Mesh(_smokeGeo, new T.MeshBasicMateria
 function updateSmokes(dtt){ for(let i=smokes.length-1;i>=0;i--){ const s=smokes[i]; s.life-=dtt; const m=s.mesh;
   m.scale.multiplyScalar(1+dtt*3); m.material.opacity=Math.max(0, s.life/0.7*0.55);
   if(s.life<=0){ scene.remove(m); smokes.splice(i,1); } } }
+// 파편 (박스 조각/풀잎 등이 퍼지며 사라짐)
+const debris=[]; const _debGeo=new T.BoxGeometry(0.32,0.32,0.32), _leafGeo=new T.PlaneGeometry(0.4,0.4);
+function spawnDebris(x,y,z,color,count,leaf){
+  for(let i=0;i<(count||10);i++){ const m=new T.Mesh(leaf?_leafGeo:_debGeo, new T.MeshLambertMaterial({color,side:T.DoubleSide}));
+    m.position.set(x,y,z); m.scale.setScalar(0.4+Math.random()*0.8); m.rotation.set(Math.random()*6,Math.random()*6,Math.random()*6); scene.add(m);
+    debris.push({mesh:m, vx:(Math.random()-.5)*9, vy:2.5+Math.random()*5.5, vz:(Math.random()-.5)*9, life:0.8+Math.random()*0.3, rot:(Math.random()-.5)*12}); }
+  while(debris.length>140){ const d=debris.shift(); scene.remove(d.mesh); } }
+function updateDebris(dtt){ for(let i=debris.length-1;i>=0;i--){ const d=debris[i], m=d.mesh; d.life-=dtt; d.vy-=20*dtt;
+  m.position.x+=d.vx*dtt; m.position.y+=d.vy*dtt; m.position.z+=d.vz*dtt;
+  m.rotation.x+=d.rot*dtt; m.rotation.y+=d.rot*0.7*dtt; m.scale.multiplyScalar(1-dtt*0.6);
+  if(d.life<=0 || m.position.y<-1){ scene.remove(m); debris.splice(i,1); } } }
 function hitRival(r){ r.spin=Math.max(r.spin||0,2.2); r.spd=0; }
 function crushRival(r){ r.spin=Math.max(r.spin||0,1.6); r.crushed=1.6; r.spd=0; beep(120,.18,'square',.22); }  // 작은 차 찌그러짐
 function hitPlayer(){            // 라이벌 아이템에 맞음 → 스핀(전복 아님)
@@ -1798,7 +1820,7 @@ function startCourse(courseNum){
   selEl.classList.remove('on'); titleEl.style.display='none'; carselEl.classList.remove('on');
   ui.result.classList.remove('on');
   ui.hud.classList.add('on'); $('pads').classList.add('on');
-  $('mirror-frame').classList.add('on'); $('minimap').classList.add('on');
+  $('mirror-frame').classList.add('on'); $('minimap').classList.add('on'); $('speedfx').classList.add('on');
   startMusic(THEME.scene);
   raceGirl.visible=true;
   girlState.active=true; girlState.t=0; girlState.phase='idle'; girlState.lat=4.2; girlState.s=14;
@@ -1850,6 +1872,7 @@ function finishCourse(){
   const ahead=aheadCount(), rank=ahead+1;
   G.mode='over'; ui.hud.classList.remove('on'); fadeMusic(); skidSound(false);
   $('mirror-frame').classList.remove('on'); $('minimap').classList.remove('on');
+  $('speedfx').classList.remove('on'); $('vignette').style.opacity=0; $('bluredge').style.opacity=0;
   if(eng)eng.master.gain.setTargetAtTime(0,AC?AC.currentTime:0,0.1);
   if(rank<=3){
     if(G.course>=3){
@@ -1878,6 +1901,7 @@ function finishCourse(){
 function failTimeout(){
   G.mode='over'; ui.hud.classList.remove('on'); fadeMusic(); skidSound(false);
   $('mirror-frame').classList.remove('on'); $('minimap').classList.remove('on');
+  $('speedfx').classList.remove('on'); $('vignette').style.opacity=0; $('bluredge').style.opacity=0;
   if(eng)eng.master.gain.setTargetAtTime(0,AC?AC.currentTime:0,0.1);
   ui.resBig.textContent='TIME UP';
   ui.resSub.innerHTML='시간 초과!<br>코스 '+G.course+' 다시 도전!';
@@ -1909,6 +1933,14 @@ function whoosh(){ if(!AC||muted)return; const o=AC.createOscillator(),g=AC.crea
   g.gain.setValueAtTime(.22,AC.currentTime); g.gain.exponentialRampToValueAtTime(.001,AC.currentTime+0.45);
   o.connect(g); g.connect(AC.destination); o.start(); o.stop(AC.currentTime+0.5); }
 function jingle(arr){ if(!AC||muted)return; arr.forEach(function(f,i){ setTimeout(function(){ beep(f,.14,'square',.2); }, i*70); }); }
+function pokSound(){ if(!AC||muted)return;
+  const o=AC.createOscillator(),g=AC.createGain();
+  o.type='triangle'; o.frequency.setValueAtTime(230,AC.currentTime); o.frequency.exponentialRampToValueAtTime(70,AC.currentTime+0.08);
+  g.gain.setValueAtTime(.0001,AC.currentTime); g.gain.linearRampToValueAtTime(.34,AC.currentTime+.006); g.gain.exponentialRampToValueAtTime(.001,AC.currentTime+0.12);
+  o.connect(g); g.connect(AC.destination); o.start(); o.stop(AC.currentTime+0.14);
+  const len=Math.floor(AC.sampleRate*0.06), b=AC.createBuffer(1,len,AC.sampleRate), d=b.getChannelData(0);
+  for(let i=0;i<len;i++) d[i]=(Math.random()*2-1)*Math.pow(1-i/len,3);
+  const src=AC.createBufferSource(); src.buffer=b; const ng=AC.createGain(); ng.gain.value=.3; src.connect(ng); ng.connect(AC.destination); src.start(); }
 function bangSound(){ if(!AC||muted)return;
   const o=AC.createOscillator(),g=AC.createGain();
   o.type='square'; o.frequency.setValueAtTime(190,AC.currentTime); o.frequency.exponentialRampToValueAtTime(48,AC.currentTime+0.16);
@@ -2187,6 +2219,24 @@ function drawMinimap(){
   c.strokeStyle='#fff'; c.lineWidth=2; c.stroke(); c.textBaseline='alphabetic';
 }
 
+// 고속 스피드 라인 + 주변 블러/비네팅
+let _sfxW=0,_sfxH=0;
+function sizeSpeedFX(){ const cv=$('speedfx'); if(!cv)return; _sfxW=cv.width=innerWidth; _sfxH=cv.height=innerHeight; }
+sizeSpeedFX();
+function updateSpeedFX(spd){
+  const cv=$('speedfx'); if(!cv)return; const c=cv.getContext('2d'), W=_sfxW, H=_sfxH;
+  c.clearRect(0,0,W,H);
+  const intensity=Math.max(0, Math.min(1, (spd/MAXSPD - 0.45)/0.55));
+  $('vignette').style.opacity=(intensity*0.85).toFixed(2);
+  $('bluredge').style.opacity=intensity.toFixed(2);
+  if(intensity<=0) return;
+  const cxp=W/2, cyp=H*0.46, maxR=Math.hypot(W,H)*0.62, n=Math.floor(18+intensity*72);
+  c.lineCap='round';
+  for(let i=0;i<n;i++){ const a=Math.random()*Math.PI*2, r0=maxR*(0.18+Math.random()*0.25), r1=maxR*(0.72+Math.random()*0.4);
+    c.strokeStyle='rgba(255,255,255,'+(0.12+Math.random()*0.55*intensity).toFixed(2)+')'; c.lineWidth=0.6+Math.random()*1.9;
+    c.beginPath(); c.moveTo(cxp+Math.cos(a)*r0, cyp+Math.sin(a)*r0); c.lineTo(cxp+Math.cos(a)*r1, cyp+Math.sin(a)*r1); c.stroke(); }
+}
+
 // ---------- 메인 루프 ----------
 let last=performance.now();
 function loop(now){
@@ -2310,15 +2360,20 @@ function loop(now){
     // 파괴 가능 장애물 충돌 (박스=거의 안 느려짐 / 칸막이=조금)
     for(const ob of obstacles){ if(ob.broken) continue;
       if(Math.abs(ob.s-G.s)<3.4 && Math.abs(ob.lat-G.lat)<(ob.r+0.9)){
-        ob.broken=true; ob.mesh.visible=false; flashScreen('#caa15a',.12); beep(120,.12,'square',.22);
-        if(ob.kind==='crate'){ G.spd*=0.97; } else { G.spd*=0.82; G.shakeT=.2; }
+        ob.broken=true; ob.mesh.visible=false;
+        const op=sample(ob.s), owx=op.x+Math.cos(op.h)*ob.lat, owy=groundY(op,ob.lat)+0.8, owz=op.z+Math.sin(op.h)*ob.lat;
+        if(ob.kind==='crate'){ spawnDebris(owx,owy,owz,0xb07a3a,12,false); G.spd*=0.97; }       // 나무 박스 조각
+        else if(ob.kind==='tree'){ spawnDebris(owx,owy+1.5,owz,0x3f9b3b,16,true); G.spd*=0.78; G.shakeT=.25; } // 나뭇잎
+        else { spawnDebris(owx,owy,owz,0x3f9b3b,14,true); G.spd*=0.84; G.shakeT=.2; }            // 풀/덤불 잎
+        pokSound();
       }
     }
     // 건물 충돌 (도로 밖) — 건물 부서지고 속도 감소
     if(offRoad){ for(const b of buildings){ if(b.broken) continue;
       if(Math.abs(b.s-G.s)<7 && Math.abs(b.lat-G.lat)<b.r){
         b.broken=true; b.mesh.visible=false; G.spd*=0.5; G.shakeT=.5; G.slowAccelT=2.0;
-        flashScreen('#caa15a',.3); beep(90,.3,'sawtooth',.3); msg('BUILDING DOWN!','#ff7744'); thunderSound(); playerSay('shock'); break;
+        const bp2=sample(b.s); spawnDebris(bp2.x+Math.cos(bp2.h)*b.lat, groundY(bp2,b.lat)+2, bp2.z+Math.sin(bp2.h)*b.lat, 0x9a958c, 22, false);
+        flashScreen('#caa15a',.3); beep(90,.3,'sawtooth',.3); pokSound(); msg('BUILDING DOWN!','#ff7744'); thunderSound(); playerSay('shock'); break;
       }
     }}
     // 대형 오브젝트(공룡·항공기·기차) 충돌 → 3바퀴 전복
@@ -2525,7 +2580,7 @@ function loop(now){
     ui.rank.textContent = ORD[Math.min(ahead,7)];
     ui.dist.textContent = Math.max(0,Math.round((FINISH_S-G.s)/10)*10)+' m';
     ui.prog.style.width = Math.min(100, ((G.lap-1)+G.s/FINISH_S)/TOTAL_LAPS*100)+'%';
-    drawMinimap();
+    drawMinimap(); updateSpeedFX(G.spd);
     if(G.msgT>0){G.msgT-=dt; if(G.msgT<=0)ui.msg.classList.remove('show');}
   }
 
@@ -2567,6 +2622,7 @@ function loop(now){
   updateTrain(dt);
   updateCrosswalks(dt);
   updateSmokes(dt);
+  updateDebris(dt);
   if(THEME.scene==='suburb'){
     dinoState.t+=dt;
     if(!dinoState.active && dinoState.t>dinoState.next){ dinoState.active=true; dinoState.t=0; dinoState.cross=0;
