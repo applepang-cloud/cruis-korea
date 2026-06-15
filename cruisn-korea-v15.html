@@ -880,7 +880,7 @@ function buildScenery(){
     }
   }
   // 신호등 + 횡단보도 + 건너는 사람
-  for(let s=450; s<TRACK_LEN-400; s+=850+Math.random()*450){
+  for(let s=450; s<TRACK_LEN-400; s+=600+Math.random()*300){
     const stripes=new T.Group(); place(stripes,s,0);
     for(let z=-3;z<=3;z+=1.2){ const bar=new T.Mesh(new T.BoxGeometry(ROAD_W*0.92,0.05,0.55),new T.MeshBasicMaterial({color:0xffffff})); bar.position.set(0,0.03,z); stripes.add(bar); }
     addS(stripes);
@@ -1254,6 +1254,61 @@ function makeGangCar(){
 }
 gangCar=makeGangCar(); gangCar.visible=false; scene.add(gangCar);
 
+// ===== 카메오: 스파이더맨 / 배트맨카 / 슈퍼맨 / 달+ET =====
+function makeSpiderman(){
+  const g=new T.Group(); const red=new T.MeshLambertMaterial({color:0xc01a1a}), blue=new T.MeshLambertMaterial({color:0x1a3aa6});
+  g.add(new T.Mesh(new T.BoxGeometry(0.42,0.6,0.26),red).translateY(0));
+  g.add(new T.Mesh(new T.BoxGeometry(0.44,0.3,0.28),blue).translateY(-0.42));
+  for(const sx of [-1,1]) g.add(new T.Mesh(new T.CylinderGeometry(0.07,0.06,0.75,6),blue).translateX(sx*0.14).translateY(-0.9));
+  g.add(new T.Mesh(new T.SphereGeometry(0.17,10,8),red).translateY(0.45));
+  const aL=new T.Mesh(new T.CylinderGeometry(0.06,0.05,0.8,6),red); aL.position.set(-0.18,0.6,0); aL.rotation.z=0.9;
+  const aR=new T.Mesh(new T.CylinderGeometry(0.06,0.05,0.8,6),red); aR.position.set(0.18,0.6,0); aR.rotation.z=-0.9;
+  g.add(aL,aR);
+  const web=new T.Mesh(new T.CylinderGeometry(0.02,0.02,16,4),new T.MeshBasicMaterial({color:0xffffff,transparent:true,opacity:0.6,fog:false})); web.position.y=8.6; g.add(web);
+  g.scale.setScalar(1.5); return g;
+}
+function makeBatmanCar(){
+  const g=new T.Group(); const black=new T.MeshLambertMaterial({color:0x14141a});
+  g.add(new T.Mesh(new T.BoxGeometry(2.3,.55,5.2),black).translateY(.55));
+  g.add(new T.Mesh(new T.BoxGeometry(1.9,.4,2.6),new T.MeshLambertMaterial({color:0x0c0c10})).translateY(.85).translateZ(0.2));
+  const bm=makeOccupant(false,false); bm.position.set(0,0.62,0.2); bm.scale.setScalar(0.92); g.add(bm);
+  const cowl=new T.Mesh(new T.SphereGeometry(0.19,10,8),black); cowl.position.set(0,1.42,0.2); g.add(cowl);
+  for(const sx of [-1,1]) g.add(new T.Mesh(new T.ConeGeometry(0.05,0.2,4),black).translateX(sx*0.09).translateY(1.6).translateZ(0.2));
+  const cape=new T.Mesh(new T.BoxGeometry(0.72,0.7,0.05),black); cape.position.set(0,1.05,0.62); cape.rotation.x=0.3; g.add(cape);
+  for(const sx of [-1,1]) g.add(new T.Mesh(new T.BoxGeometry(0.1,0.55,1.1),black).translateX(sx*0.92).translateY(0.95).translateZ(2.4));
+  g.add(new T.Mesh(new T.BoxGeometry(1.9,.16,.06),new T.MeshBasicMaterial({color:0xff2222})).translateY(.78).translateZ(2.6));
+  _simpleWheels(g,.46,[[-1.12,-1.7],[1.12,-1.7],[-1.12,1.7],[1.12,1.7]]);
+  return g;
+}
+function makeSuperman(){
+  const g=new T.Group(); const blue=new T.MeshLambertMaterial({color:0x1a44c0}), red=new T.MeshLambertMaterial({color:0xcc1a1a}), skin=new T.MeshLambertMaterial({color:0xf0c8a0});
+  const body=new T.Mesh(new T.CylinderGeometry(0.22,0.18,1.2,8),blue); body.rotation.x=Math.PI/2; g.add(body);
+  g.add(new T.Mesh(new T.SphereGeometry(0.2,12,10),skin).translateZ(-0.75)); // head forward
+  for(const sx of [-1,1]) g.add(new T.Mesh(new T.CylinderGeometry(0.07,0.06,0.7,6),blue).translateX(sx*0.18).translateZ(-0.5).rotateX(Math.PI/2)); // arms forward
+  g.add(new T.Mesh(new T.BoxGeometry(0.1,0.2,0.1),red).translateZ(-0.55)); // chest accent
+  const cape=new T.Mesh(new T.PlaneGeometry(0.9,1.4),new T.MeshLambertMaterial({color:0xcc1a1a,side:T.DoubleSide})); cape.position.set(0,0,0.7); cape.rotation.x=-0.3; g.add(cape);
+  g.scale.setScalar(1.6); return g;
+}
+function makeETBike(){
+  const g=new T.Group(); const blk=new T.MeshBasicMaterial({color:0x101014,fog:false});
+  for(const sx of [-1,1]){} // wheels
+  g.add(new T.Mesh(new T.TorusGeometry(0.5,0.06,6,16),blk).translateX(-0.7));
+  g.add(new T.Mesh(new T.TorusGeometry(0.5,0.06,6,16),blk).translateX(0.7));
+  g.add(new T.Mesh(new T.BoxGeometry(1.4,0.08,0.08),blk).translateY(0.1));
+  g.add(new T.Mesh(new T.BoxGeometry(0.08,0.5,0.08),blk).translateX(0.6).translateY(0.35)); // 핸들
+  g.add(new T.Mesh(new T.BoxGeometry(0.25,0.7,0.2),blk).translateX(-0.1).translateY(0.75)); // 라이더 몸
+  g.add(new T.Mesh(new T.SphereGeometry(0.16,8,6),blk).translateX(-0.1).translateY(1.25));  // 라이더 머리
+  g.add(new T.Mesh(new T.SphereGeometry(0.2,8,6),blk).translateX(0.55).translateY(0.55));   // ET (바구니)
+  g.scale.setScalar(1.0); return g;
+}
+const spiderman=makeSpiderman(); spiderman.visible=false; scene.add(spiderman); const spiderState={t:0};
+const batCar=makeBatmanCar(); batCar.visible=false; scene.add(batCar); const batState={s:0,lat:0,shootT:2};
+const superman=makeSuperman(); superman.visible=false; scene.add(superman); const supState={t:0,active:false,next:5,phase:0};
+const moon=new T.Mesh(new T.CircleGeometry(34,40), new T.MeshBasicMaterial({color:0xfdf3c8,fog:false})); scene.add(moon);
+const etBike=makeETBike(); etBike.visible=false; scene.add(etBike); const etState={active:false,next:7,prog:0};
+const bats=[]; const _batGeo=new T.BoxGeometry(0.5,0.1,0.18), _batMat=new T.MeshBasicMaterial({color:0x14141a});
+function spawnBat(s,lat){ const m=new T.Mesh(_batGeo,_batMat); scene.add(m); bats.push({s,lat,mesh:m,dist:0,ph:Math.random()*6}); while(bats.length>30){const b=bats.shift();scene.remove(b.mesh);} }
+
 // ---------- 레이싱 걸 (출발 진행요원) — 정교화 버전 ----------
 function checkerTex(n){
   const cv=document.createElement('canvas'); cv.width=cv.height=64; const c=cv.getContext('2d');
@@ -1371,7 +1426,7 @@ const rivals = RIVAL_COLORS.map((c,i)=>({
   mesh:(()=>{const m=makeCar(c,true);scene.add(m);return m;})(),
   s: -8 - i*7, lat:(i%2? 2.6:-2.6)+(Math.random()-.5),
   base: 54 + i*0.5 + Math.random()*1.5, // m/s — 주인공급(독주 방지)
-  wob: Math.random()*6.28, lap:1, driver:i, itemT:5+Math.random()*5   // itemT: 아이템 공격 타이머
+  wob: Math.random()*6.28, lap:1, driver:i, itemReady:0, itemFillT:12   // 아이템 획득식 공격
 }));
 rivals.forEach(r=>{ const sp=makeRankSprite(); r.mesh.userData.rankSprite=sp; r.mesh.add(sp); });
 
@@ -1505,10 +1560,11 @@ const COURSES=[
 ];
 let TOTAL_LAPS=3;   // 코스 시작 시 COURSES[c].laps로 설정
 // 난이도 (이지=현재, 하드=적 빠름, 수퍼하드=더 빠름+아이템 공격↑)
+// fillMin/fillRand = 라이벌이 아이템을 다시 "획득"하는 간격(초). 길수록 공격이 뜸함.
 const DIFF_SETTINGS={
-  easy:      {label:'EASY',       speed:1.0,  itemChance:0.55, itemMin:7,   itemRand:6},
-  hard:      {label:'HARD',       speed:1.15, itemChance:0.78, itemMin:5,   itemRand:5},
-  superhard: {label:'SUPER HARD', speed:1.28, itemChance:0.97, itemMin:3.4, itemRand:3.4},
+  easy:      {label:'EASY',       speed:1.0,  fillMin:18, fillRand:8},
+  hard:      {label:'HARD',       speed:1.12, fillMin:12, fillRand:6},
+  superhard: {label:'SUPER HARD', speed:1.22, fillMin:8,  fillRand:5},
 };
 let gameDiff='easy';
 function DIFF(){ return DIFF_SETTINGS[gameDiff]||DIFF_SETTINGS.easy; }
@@ -1930,7 +1986,7 @@ function startCourse(courseNum){
   THEME=THEMES[co.map]; buildScenery();
   G.mode='countdown'; G.s=0; G.lat=0; G.spd=0; G.time=co.time; G.nextCk=0; G.lap=1; G.introCam=0;
   G.countdown=4.4; G.tauntT=6; G.finishedCount=0;
-  rivals.forEach((r,i)=>{ r.s=-8-i*7; r.spd=0; r.lap=1; r.base=54+i*0.5+Math.random()*1.5; r.itemT=5+Math.random()*5; r.spin=0; r.shrink=0; r.crushed=0; r.slowAccelT=0; r.finished=false; r.mesh.scale.set(1,1,1); });
+  rivals.forEach((r,i)=>{ r.s=-8-i*7; r.spd=0; r.lap=1; r.base=54+i*0.5+Math.random()*1.5; r.itemReady=0; r.itemFillT=10+Math.random()*8+i; r.spin=0; r.shrink=0; r.crushed=0; r.slowAccelT=0; r.finished=false; r.mesh.scale.set(1,1,1); });
   resetRaceObjects();
   selEl.classList.remove('on'); titleEl.style.display='none'; carselEl.classList.remove('on');
   ui.result.classList.remove('on');
@@ -2404,6 +2460,52 @@ function updateGang(dt, now){
     spawnBullet(gangState.s+3, gangState.lat, 'rival'); beep(900,.05,'square',.18);
     if(Math.random()<.35) rivalSay(rivals[0],'taunt'); }
 }
+// 카메오들 (스파이더맨·배트맨카·슈퍼맨·달·ET)
+function updateCameos(dt, now){
+  const racing=(G.mode==='race'||G.mode==='replay');
+  const inCity=racing && THEME.scene==='city';
+  // 스파이더맨 (도시: 빌딩 사이 거미줄 스윙)
+  if(inCity){ spiderman.visible=true; spiderState.t+=dt; const ph=spiderState.t*1.6;
+    const p=sample(G.s+45), lat=Math.sin(ph)*16, yArc=11+Math.abs(Math.cos(ph))*6;
+    spiderman.position.set(p.x+Math.cos(p.h)*lat, yArc, p.z+Math.sin(p.h)*lat);
+    spiderman.rotation.set(0,-p.h,-Math.cos(ph)*0.5);
+  } else if(spiderman.visible) spiderman.visible=false;
+  // 배트맨카 (도시: 박쥐 발사)
+  if(inCity){ batCar.visible=true;
+    batState.s += ((G.s+30)-batState.s)*Math.min(1,dt*2);
+    batState.lat += ((-ROAD_W*0.2+Math.sin(now*0.001)*2)-batState.lat)*Math.min(1,dt*2);
+    place(batCar, Math.max(batState.s,0), batState.lat, 0);
+    batState.shootT-=dt; if(batState.shootT<=0){ batState.shootT=0.5+Math.random()*0.6; spawnBat(batState.s+3, batState.lat+(Math.random()-.5)*2); }
+  } else if(batCar.visible) batCar.visible=false;
+  for(let i=bats.length-1;i>=0;i--){ const b=bats[i]; b.s+=90*dt; b.dist+=90*dt; b.ph+=dt*22;
+    const p=sample(b.s); b.mesh.position.set(p.x+Math.cos(p.h)*b.lat, p.y+2.0+Math.sin(b.ph)*0.4, p.z+Math.sin(p.h)*b.lat);
+    b.mesh.rotation.set(0,-p.h,Math.sin(b.ph)*0.7);
+    if(b.dist>120){ scene.remove(b.mesh); bats.splice(i,1); } }
+  // 슈퍼맨 (하늘에서 내려왔다 올라감)
+  if(racing){ supState.next-=dt;
+    if(!supState.active && supState.next<=0){ supState.active=true; supState.t=0; superman.visible=true; supState.startS=G.s+55; supState.side=(Math.random()<.5?-1:1); }
+    if(supState.active){ supState.t+=dt; const TT=4.5, pr=Math.min(1,supState.t/TT);
+      const p=sample(supState.startS - pr*38);
+      const y=6 + 55*(1-Math.sin(pr*Math.PI));   // 내려왔다 다시 올라감
+      const lat=supState.side*8;
+      superman.position.set(p.x+Math.cos(p.h)*lat, y, p.z+Math.sin(p.h)*lat);
+      superman.rotation.set(pr<0.5?0.4:-0.4, -p.h+Math.PI, 0);
+      if(supState.t>=TT){ supState.active=false; superman.visible=false; supState.next=8+Math.random()*10; }
+    }
+  } else if(superman.visible) superman.visible=false;
+  // 달 (하늘에 큰 달, 시야 앞쪽 상단)
+  const fwd=new T.Vector3(); camera.getWorldDirection(fwd);
+  moon.position.copy(camera.position).addScaledVector(fwd,480); moon.position.y+=150; moon.position.x-=90;
+  moon.lookAt(camera.position);
+  // ET 자전거 (달 위를 가로지름)
+  etState.next-=dt;
+  if(!etState.active && etState.next<=0){ etState.active=true; etState.prog=0; etBike.visible=true; }
+  if(etState.active){ etState.prog+=dt*0.22; const pr=etState.prog;
+    etBike.scale.setScalar(6);
+    etBike.position.set(moon.position.x-55+pr*110, moon.position.y-4+Math.sin(pr*Math.PI)*7, moon.position.z+8);
+    etBike.lookAt(camera.position);
+    if(pr>=1){ etState.active=false; etBike.visible=false; etState.next=12+Math.random()*12; } }
+}
 
 // ---------- 메인 루프 ----------
 let last=performance.now();
@@ -2581,13 +2683,16 @@ function loop(now){
           r.lat += (wish-r.lat)*dt*1.4;
           if(shrunk){ for(const t of traffic){ if(Math.abs(t.s-r.s)<3&&Math.abs(t.lat-r.lat)<2){ crushRival(r); break; } } }  // 작을 때 일반차에 밟혀 찌그러짐
           // 라이벌 아이템 공격 (가까울 때, 60%)
-          r.itemT-=dt;
-          if(r.itemT<=0){ const DF=DIFF(); r.itemT=DF.itemMin+Math.random()*DF.itemRand;
+          // 아이템 획득(충전) → 보유 시 가까울 때 사용 (실제 유저처럼)
+          const DF=DIFF();
+          if((r.itemFillT-=dt)<=0 && !r.itemReady){ r.itemReady=1; }
+          if(r.itemReady && !shrunk && G.star<=0){
             const d=rivalTotal(r)-playerTotal();
-            if(Math.abs(d)<175 && G.star<=0 && !shrunk && Math.random()<DF.itemChance){
-              if(d<0) spawnMissile(r.s+4, r.lat, true, null, 'rival');
-              else spawnBanana(r.s-6, r.lat, 'rival');
-              if(Math.random()<.5) rivalSay(r,'taunt');
+            if(Math.abs(d)<170){
+              if(d<0) spawnMissile(r.s+4, r.lat, true, null, 'rival');   // 뒤 → 유도 미사일
+              else spawnBanana(r.s-6, r.lat, 'rival');                   // 앞 → 바나나
+              r.itemReady=0; r.itemFillT=DF.fillMin+Math.random()*DF.fillRand;
+              if(Math.random()<.4) rivalSay(r,'taunt');
             }
           }
         }
@@ -2799,6 +2904,7 @@ function loop(now){
   updateDebris(dt);
   updateSpecialCars(dt, now);
   updateGang(dt, now);
+  updateCameos(dt, now);
   if(THEME.scene==='suburb'){
     dinoState.t+=dt;
     if(!dinoState.active && dinoState.t>dinoState.next){ dinoState.active=true; dinoState.t=0; dinoState.cross=0;
