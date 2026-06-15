@@ -75,7 +75,9 @@
   .facebox.on{display:flex}
   .facebox.right{right:14px;top:13%;flex-direction:row}   /* 우측 미니맵 위쪽 */
   .facebox:not(.right){left:14px;flex-direction:row-reverse}
-  .face{width:clamp(72px,15vw,104px);height:clamp(96px,20vw,138px);background-image:url(drivers.png);background-repeat:no-repeat;border:3px solid #ffffffcc;border-radius:10px;box-shadow:0 4px 10px #0009;background-color:#10142a;flex-shrink:0}
+  .face{position:relative;width:clamp(72px,15vw,104px);height:clamp(96px,20vw,138px);background-image:url(drivers.png);background-repeat:no-repeat;border:3px solid #ffffffcc;border-radius:10px;box-shadow:0 4px 10px #0009;background-color:#10142a;flex-shrink:0}
+  .dname{position:absolute;bottom:0;left:0;right:0;background:#000c;color:#ffd722;font-size:clamp(10px,2.2vw,14px);font-weight:900;text-align:center;border-radius:0 0 7px 7px;padding:1px 0;letter-spacing:-0.5px;white-space:nowrap}
+  .dname:empty{display:none}
   .bubble{max-width:46vw;background:#fff;color:#111;font-weight:900;font-style:italic;font-size:clamp(13px,3vw,22px);padding:8px 14px;border-radius:16px;position:relative;box-shadow:0 3px 8px #0007;white-space:nowrap}
   .bubble:empty{display:none}
   .facebox.right .bubble::after{content:'';position:absolute;right:-8px;bottom:14px;border:8px solid transparent;border-left-color:#fff}
@@ -187,8 +189,8 @@
     <div class="islot" id="islot1"><span class="ikey">X</span><span class="iicon" id="iicon1"></span></div>
   </div>
   <!-- 드라이버 얼굴 + 말풍선 -->
-  <div id="face-L" class="facebox"><div class="bubble" id="faceL-bub"></div><div class="face" id="faceL-img"></div></div>
-  <div id="face-R" class="facebox right"><div class="bubble" id="faceR-bub"></div><div class="face" id="faceR-img"></div></div>
+  <div id="face-L" class="facebox"><div class="bubble" id="faceL-bub"></div><div class="face" id="faceL-img"><span class="dname" id="faceL-name"></span></div></div>
+  <div id="face-R" class="facebox right"><div class="bubble" id="faceR-bub"></div><div class="face" id="faceR-img"><span class="dname" id="faceR-name"></span></div></div>
 </div>
 
 <!-- 타이틀 -->
@@ -2175,6 +2177,8 @@ function startRollout(){
 const FACE_W=104, FACE_H=138, _bgW=FACE_W*8, _bgH=FACE_H*4;
 let _voices=[];
 const DRIVER_GENDER=['M','M','M','F','F','M','F','F'];
+const DRIVER_NAMES =['강민호','박지성','이준','한소희','김유나','정태양','서아린','최보라']; // 8 드라이버 이름
+const DRIVER_KEY   =['minho','jisung','jun','sohee','yuna','taeyang','arin','bora'];       // mp3 파일명용 키
 // 자동 배정: 한국어 자연(Natural/Online) 음성 우선, 남/녀 분리
 let DRIVER_VOICE=[], CASTER_VOICE=null;
 const MALE_RE=/injoon|hyunsu|gilbert|in-joon|male|\bman\b/i;
@@ -2190,7 +2194,7 @@ function assignVoices(){
 }
 function loadVoices(){ try{_voices=speechSynthesis.getVoices()||[];}catch(e){_voices=[];} assignVoices(); }
 if('speechSynthesis' in window){ loadVoices(); try{speechSynthesis.addEventListener('voiceschanged',loadVoices);}catch(e){} }
-function speakAs(d,text){
+function speakAs(d,text,file){
   if(muted)return;
   playVoice(text, function(){ if(!('speechSynthesis' in window))return;
   try{
@@ -2204,7 +2208,7 @@ function speakAs(d,text){
     u.volume=1;
     speechSynthesis.speak(u);
   }catch(e){}
-  });
+  }, file);
 }
 function faceStyle(el,driver,expr){
   const col=(driver%2)*4+expr, row=Math.floor((driver%8)/2);
@@ -2213,11 +2217,12 @@ function faceStyle(el,driver,expr){
   el.style.backgroundPosition=(-col*FACE_W)+'px '+(-row*FACE_H)+'px';
 }
 let faceLT=0, faceRT=0;
-function showFace(side,driver,expr,text){
+function showFace(side,driver,expr,text,file){
   const box=$(side==='L'?'face-L':'face-R'), img=$(side==='L'?'faceL-img':'faceR-img'), bub=$(side==='L'?'faceL-bub':'faceR-bub');
   if(!box)return; faceStyle(img,driver,expr); bub.textContent=text||''; box.classList.add('on');
+  const nm=$(side==='L'?'faceL-name':'faceR-name'); if(nm) nm.textContent=DRIVER_NAMES[driver%8]||'';
   if(side==='L')faceLT=2.6; else faceRT=2.6;
-  if(text) speakAs(driver,text);
+  if(text) speakAs(driver,text,file);
 }
 const LINES={
   taunt:{e:0,t:['덤벼봐!','느려!','내가 우승하겠어!','이 정도냐!','따라와 봐!']},
@@ -2227,8 +2232,13 @@ const LINES={
   missileSeen:{e:2,t:['미사일이다!','피해야 해!','날아온다!']},
   angry:{e:3,t:['두고 보자!','반칙이야!','이대론 못 끝내!']}
 };
-function rivalSay(r,kind){ const L=LINES[kind]; if(!L||!r)return; showFace('R', r.driver%8, L.e, pick(L.t)); }
-function playerSay(kind){ const L=LINES[kind]; if(!L)return; showFace('L', G.playerDriver, L.e, pick(L.t)); }
+function lineFileFor(driver,kind,idx){   // 드라이버별 보이스 파일명
+  const key=DRIVER_KEY[driver%8]||('d'+(driver%8));
+  if(kind==='itemHit' && idx===0) return 'line_'+key+'_shock_1.mp3';   // '으악!'은 shock_1 재사용
+  return 'line_'+key+'_'+kind.toLowerCase()+'_'+(idx+1)+'.mp3';
+}
+function rivalSay(r,kind){ const L=LINES[kind]; if(!L||!r)return; const d=r.driver%8, i=(Math.random()*L.t.length)|0; showFace('R', d, L.e, L.t[i], lineFileFor(d,kind,i)); }
+function playerSay(kind){ const L=LINES[kind]; if(!L)return; const d=G.playerDriver, i=(Math.random()*L.t.length)|0; showFace('L', d, L.e, L.t[i], lineFileFor(d,kind,i)); }
 
 // ====== 음성 매니페스트 (mp3 우선, 없으면 TTS) ======
 const CROWD_LINES=['와! 배트맨이다!','와! 스파이더맨이다!','우와, 슈퍼맨이다!','저기 봐, UFO다!','조커잖아, 도망쳐!'];
@@ -2237,14 +2247,14 @@ const VOICE_MANIFEST=[], LINE_FILE={};
 (function(){
   function add(cat,charType,text,file){ if(LINE_FILE[text]) return; LINE_FILE[text]=file; VOICE_MANIFEST.push({cat,charType,text,file}); }
   for(const k in SAY) SAY[k].forEach((t,i)=>add('중계','중계(여성)',t,'cast_'+k.toLowerCase()+'_'+(i+1)+'.mp3'));
-  for(const k in LINES) LINES[k].t.forEach((t,i)=>add('대사','라이벌/플레이어',t,'line_'+k.toLowerCase()+'_'+(i+1)+'.mp3'));
+  // 드라이버 대사는 lineFileFor()로 드라이버별 파일을 직접 지정하므로 여기선 등록 안 함
   CROWD_LINES.forEach((t,i)=>add('군중','길가 사람들',t,'crowd_'+(i+1)+'.mp3'));
   add('조커','조커(UFO)',JOKER_LINE,'joker_1.mp3');
 })();
 const VOICE_DIR='voice/', _voiceAudio={};
-function playVoice(text, ttsFn){   // mp3 파일이 있으면 mp3, 없으면 TTS
+function playVoice(text, ttsFn, fileOverride){   // mp3 파일이 있으면 mp3, 없으면 TTS
   if(muted) return;
-  const file=LINE_FILE[text];
+  const file=fileOverride || LINE_FILE[text];
   if(!file || _voiceAudio[file]===false){ if(ttsFn)ttsFn(); return; }
   let a=_voiceAudio[file];
   if(!a){ a=new Audio(VOICE_DIR+file); a.volume=1; _voiceAudio[file]=a; }
