@@ -146,6 +146,13 @@
   .stat-bar{flex:1;height:7px;background:#000;border:1px solid #2a3566;border-radius:3px;overflow:hidden}
   .stat-bar i{display:block;height:100%;background:linear-gradient(90deg,#ffd722,#ff8a00)}
   .sel-back{pointer-events:auto;cursor:pointer;color:#9fb0d8;font-style:italic;font-weight:900;font-size:clamp(12px,2.6vw,17px);text-decoration:underline}
+  /* 타이틀: 난이도 + 프리모드 */
+  #diff-row{display:flex;gap:10px;margin-top:4px;pointer-events:auto}
+  .diff-btn{cursor:pointer;color:#cfe0ff;font:900 italic clamp(12px,2.4vw,18px) Arial;padding:6px 14px;border:2px solid #ffffff44;border-radius:20px;background:rgba(10,14,40,.5);transform:skewX(-8deg)}
+  .diff-btn .lbl{display:inline-block;transform:skewX(8deg)}
+  .diff-btn.sel{color:#222;background:linear-gradient(180deg,#ffe24a,#ffb01e);border-color:#fff;box-shadow:0 3px 0 #5e0f0a}
+  #freemode-btn{cursor:pointer;pointer-events:auto;color:#fff;font:900 italic clamp(13px,2.6vw,20px) Arial;padding:8px 20px;border:3px solid #2ad8ff;border-radius:24px;background:linear-gradient(180deg,#1a6fae,#0d3a6e);box-shadow:0 4px 0 #062239;transform:skewX(-8deg)}
+  #freemode-btn:active{transform:skewX(-8deg) translateY(3px);box-shadow:0 1px 0 #062239}
 </style>
 </head>
 <body>
@@ -190,6 +197,12 @@
   <div id="shield"><div class="rim"></div><div class="body"></div><div class="band"></div><div class="usa">KOREA</div></div>
   <div class="free">FREE GAME FOR<br>1ST PLACE</div>
   <div id="press">PRESS START · 터치해서 시작</div>
+  <div id="diff-row">
+    <div class="diff-btn sel" data-diff="easy">EASY</div>
+    <div class="diff-btn" data-diff="hard">HARD</div>
+    <div class="diff-btn" data-diff="superhard">SUPER HARD</div>
+  </div>
+  <div id="freemode-btn">🗺️ FREE MODE · 맵 자유선택</div>
   <div class="coin">1 COIN / 1 CREDIT &nbsp;·&nbsp; ←→ 핸들 · ↑ 가속 · ↓ 브레이크</div>
 </div>
 
@@ -1491,6 +1504,14 @@ const COURSES=[
   {map:'beach',  name:'COURSE 3 · STORMY BEACH', diff:1.16, time:44, ck:5, lap:5, laps:3},
 ];
 let TOTAL_LAPS=3;   // 코스 시작 시 COURSES[c].laps로 설정
+// 난이도 (이지=현재, 하드=적 빠름, 수퍼하드=더 빠름+아이템 공격↑)
+const DIFF_SETTINGS={
+  easy:      {label:'EASY',       speed:1.0,  itemChance:0.55, itemMin:7,   itemRand:6},
+  hard:      {label:'HARD',       speed:1.15, itemChance:0.78, itemMin:5,   itemRand:5},
+  superhard: {label:'SUPER HARD', speed:1.28, itemChance:0.97, itemMin:3.4, itemRand:3.4},
+};
+let gameDiff='easy';
+function DIFF(){ return DIFF_SETTINGS[gameDiff]||DIFF_SETTINGS.easy; }
 let unlockedCourse=1;          // 클리어로 해금된 최고 코스 (게임오버해도 유지)
 let resultMode='retry';        // advance | retry | champion
 
@@ -1503,7 +1524,7 @@ const G={
   msgT:0, crashT:0, shakeT:0,
   startT:0, countdown:0,
   car:CARS[0],           // 선택된 차량
-  course:1, lap:1, diff:1, introCam:0, finishedCount:0,
+  course:1, lap:1, diff:1, introCam:0, finishedCount:0, freeMode:false,
   items:[null,null],     // Z슬롯, X슬롯
   star:0, boost:0,       // 무적/부스트 남은 시간
   airT:0, airDur:0, airY:0, // 점프
@@ -1530,7 +1551,7 @@ const KEY={ArrowLeft:'L',KeyA:'L',ArrowRight:'R',KeyD:'R',ArrowUp:'G',KeyW:'G',A
 addEventListener('keydown',e=>{
   if(KEY[e.code]) input[KEY[e.code]]=true;
   if(G.mode==='race'){ if(e.code==='KeyZ') useItem(0); else if(e.code==='KeyX') useItem(1); }
-  if(G.mode==='title' && (e.code==='Enter'||e.code==='Space'||KEY[e.code])) openCarSelect();
+  if(G.mode==='title' && (e.code==='Enter'||e.code==='Space'||KEY[e.code])){ G.freeMode=false; openCarSelect(); }
 });
 addEventListener('keyup',e=>{ if(KEY[e.code]) input[KEY[e.code]]=false; });
 if('ontouchstart' in window) document.body.classList.add('touch');
@@ -1924,13 +1945,23 @@ function startCourse(courseNum){
 }
 // 차량 카드 생성 (3D 썸네일 + 스탯)
 buildCarCards();
-// 타이틀 → 차 선택
-$('press').addEventListener('click',openCarSelect);
-titleEl.addEventListener('click',openCarSelect);
+// 타이틀: 난이도 선택
+document.querySelectorAll('.diff-btn').forEach(b=>{
+  b.addEventListener('click',e=>{ e.stopPropagation();
+    gameDiff=b.dataset.diff;
+    document.querySelectorAll('.diff-btn').forEach(x=>x.classList.toggle('sel',x===b));
+    beep(880,.08);
+  });
+});
+// 타이틀 → 차 선택 (캠페인)
+$('press').addEventListener('click',()=>{ G.freeMode=false; openCarSelect(); });
+titleEl.addEventListener('click',()=>{ G.freeMode=false; openCarSelect(); });
+// 프리 모드 (맵 자유 선택)
+$('freemode-btn').addEventListener('click',e=>{ e.stopPropagation(); G.freeMode=true; openCarSelect(); });
 // 코스 카드 → 캠페인 시작 (해금된 코스만)
 function updateCourseLocks(){
   document.querySelectorAll('#select .sel-card').forEach((card,idx)=>{
-    const locked=(idx+1)>unlockedCourse;
+    const locked=!G.freeMode && (idx+1)>unlockedCourse;   // 프리모드=전부 해제
     card.style.opacity=locked?'0.4':'1';
     card.style.filter=locked?'grayscale(1)':'none';
     let lk=card.querySelector('.lock-badge');
@@ -1943,7 +1974,7 @@ function updateCourseLocks(){
 document.querySelectorAll('#select .sel-card').forEach((card,idx)=>{
   card.addEventListener('click',e=>{ e.stopPropagation();
     const cn=idx+1;
-    if(cn>unlockedCourse){ beep(160,.18,'sawtooth'); msg('LOCKED 🔒','#ff5147'); return; }
+    if(!G.freeMode && cn>unlockedCourse){ beep(160,.18,'sawtooth'); msg('LOCKED 🔒','#ff5147'); return; }
     startCourse(cn);
   });
 });
@@ -1952,13 +1983,14 @@ $('course-back').addEventListener('click',e=>{ e.stopPropagation(); openCarSelec
 // 결과 버튼: 진출/재도전/타이틀
 function updateResultBtn(){
   const b=$('res-btn');
-  b.textContent = resultMode==='advance'?'NEXT COURSE ▶' : resultMode==='champion'?'BACK TO TITLE' : 'RETRY';
+  b.textContent = resultMode==='advance'?'NEXT COURSE ▶' : resultMode==='champion'?'BACK TO TITLE' : resultMode==='free'?'🗺️ 맵 선택':'RETRY';
 }
 $('res-btn').addEventListener('click',()=>{
   ui.result.classList.remove('on');
   const rp=$('replay'); if(rp) rp.classList.remove('on');
   if(resultMode==='advance') startCourse(G.course+1);
   else if(resultMode==='champion'){ G.mode='title'; titleEl.style.display='flex'; ui.hud.classList.remove('on'); }
+  else if(resultMode==='free') openSelect();   // 프리모드: 다른 맵 선택
   else startCourse(G.course);
 });
 
@@ -1968,6 +2000,13 @@ function finishCourse(){
   $('mirror-frame').classList.remove('on'); $('minimap').classList.remove('on');
   $('speedfx').classList.remove('on'); $('vignette').style.opacity=0; $('bluredge').style.opacity=0;
   if(eng)eng.master.gain.setTargetAtTime(0,AC?AC.currentTime:0,0.1);
+  if(G.freeMode){   // 프리 모드: 순위만 보여주고 맵 선택으로
+    ui.resBig.textContent='FINISH!';
+    ui.resSub.innerHTML=ORD[ahead].toUpperCase()+' PLACE · FREE MODE<br>다른 맵을 골라보세요!';
+    resultMode='free'; beep(660,.2);setTimeout(()=>beep(880,.2),180);
+    say(ORD_KR[ahead]+'로 골인! 프리 모드입니다.',true);
+    ui.result.classList.add('on'); updateResultBtn(); startReplay(); return;
+  }
   if(rank<=3){
     if(G.course>=3){
       unlockedCourse=3;
@@ -1998,8 +2037,8 @@ function failTimeout(){
   $('speedfx').classList.remove('on'); $('vignette').style.opacity=0; $('bluredge').style.opacity=0;
   if(eng)eng.master.gain.setTargetAtTime(0,AC?AC.currentTime:0,0.1);
   ui.resBig.textContent='TIME UP';
-  ui.resSub.innerHTML='시간 초과!<br>코스 '+G.course+' 다시 도전!';
-  resultMode='retry'; beep(196,.5,'sawtooth');
+  ui.resSub.innerHTML = G.freeMode? '시간 초과!<br>다른 맵을 골라보세요!' : '시간 초과!<br>코스 '+G.course+' 다시 도전!';
+  resultMode = G.freeMode?'free':'retry'; beep(196,.5,'sawtooth');
   say('시간 초과! 레이스가 종료됩니다.',true);
   ui.result.classList.add('on'); updateResultBtn(); startReplay();
 }
@@ -2531,7 +2570,7 @@ function loop(now){
           if((r.slowAccelT||0)>0) r.slowAccelT-=dt;
           const ramp=(r.slowAccelT||0)>0? 0.3 : 0.9;   // 충돌 후 저가속
           const gap=playerTotal()-rivalTotal(r);
-          let target=(r.base*G.diff)*(shrunk?0.45:1) + Math.max(-8,Math.min(20, gap*.045));  // 뒤처지면 강하게 추격
+          let target=(r.base*G.diff*DIFF().speed)*(shrunk?0.45:1) + Math.max(-8,Math.min(20, gap*.045));  // 난이도·뒤처짐 반영
           r.spd = r.spd + (target-r.spd)*dt*ramp;
           r.spd -= slope(r.s)*18*dt;
           r.s += Math.max(0,r.spd)*dt;
@@ -2543,9 +2582,9 @@ function loop(now){
           if(shrunk){ for(const t of traffic){ if(Math.abs(t.s-r.s)<3&&Math.abs(t.lat-r.lat)<2){ crushRival(r); break; } } }  // 작을 때 일반차에 밟혀 찌그러짐
           // 라이벌 아이템 공격 (가까울 때, 60%)
           r.itemT-=dt;
-          if(r.itemT<=0){ r.itemT=7+Math.random()*6;
+          if(r.itemT<=0){ const DF=DIFF(); r.itemT=DF.itemMin+Math.random()*DF.itemRand;
             const d=rivalTotal(r)-playerTotal();
-            if(Math.abs(d)<175 && G.star<=0 && !shrunk && Math.random()<0.6){
+            if(Math.abs(d)<175 && G.star<=0 && !shrunk && Math.random()<DF.itemChance){
               if(d<0) spawnMissile(r.s+4, r.lat, true, null, 'rival');
               else spawnBanana(r.s-6, r.lat, 'rival');
               if(Math.random()<.5) rivalSay(r,'taunt');
