@@ -1308,6 +1308,23 @@ const moon=new T.Mesh(new T.CircleGeometry(34,40), new T.MeshBasicMaterial({colo
 const etBike=makeETBike(); etBike.visible=false; scene.add(etBike); const etState={active:false,next:7,prog:0};
 const bats=[]; const _batGeo=new T.BoxGeometry(0.5,0.1,0.18), _batMat=new T.MeshBasicMaterial({color:0x14141a});
 function spawnBat(s,lat){ const m=new T.Mesh(_batGeo,_batMat); scene.add(m); bats.push({s,lat,mesh:m,dist:0,ph:Math.random()*6}); while(bats.length>30){const b=bats.shift();scene.remove(b.mesh);} }
+// 조커 UFO (비행접시)
+function makeUFO(){
+  const g=new T.Group();
+  g.add(new T.Mesh(new T.CylinderGeometry(2.4,2.9,0.45,18),new T.MeshLambertMaterial({color:0x9aa2ac})));
+  g.add(new T.Mesh(new T.CylinderGeometry(2.9,2.4,0.2,18),new T.MeshLambertMaterial({color:0x6a7079})).translateY(-0.2));
+  const dome=new T.Mesh(new T.SphereGeometry(1.3,14,9,0,Math.PI*2,0,Math.PI/2),new T.MeshLambertMaterial({color:0x9fe6ff,transparent:true,opacity:0.55})); dome.position.y=0.25; g.add(dome);
+  for(let i=0;i<10;i++){ const a=i/10*Math.PI*2; g.add(new T.Mesh(new T.SphereGeometry(0.16,6,5),new T.MeshBasicMaterial({color:0xffdd33})).translateX(Math.cos(a)*2.3).translateY(-0.25).translateZ(Math.sin(a)*2.3)); }
+  // 조커
+  const j=makeOccupant(false,false); j.position.set(0,0.35,0); j.scale.setScalar(0.7); g.add(j);
+  g.add(new T.Mesh(new T.SphereGeometry(0.2,8,7),new T.MeshLambertMaterial({color:0x2ab82a})).translateY(0.95)); // 초록 머리
+  g.add(new T.Mesh(new T.SphereGeometry(0.16,8,7),new T.MeshLambertMaterial({color:0xeef0ee})).translateY(0.82).translateZ(0.06)); // 흰 얼굴
+  return g;
+}
+const ufo=makeUFO(); ufo.visible=false; scene.add(ufo); const ufoState={active:false,next:9,t:0,startS:0,lat:0};
+const cameoState={t:3};
+function cameoSay(text){ showCaption(text); playVoice(text, function(){ if(muted||!('speechSynthesis'in window))return;
+  try{ const u=new SpeechSynthesisUtterance(text); u.lang='ko-KR'; const ko=_voices.filter(v=>/ko/i.test(v.lang)); if(ko.length)u.voice=ko[Math.floor(Math.random()*ko.length)]; u.pitch=1.45; u.rate=1.2; u.volume=1; speechSynthesis.speak(u);}catch(e){} }); }
 
 // ---------- 레이싱 걸 (출발 진행요원) — 정교화 버전 ----------
 function checkerTex(n){
@@ -1886,19 +1903,21 @@ function showCaption(text){
 }
 function say(text, priority){
   if(muted) return;
-  showCaption(text);                 // 자막은 항상 표시 (TTS가 막혀도 보이게)
-  if(!TTS.on) return;
+  showCaption(text);                 // 자막은 항상 표시
   const now=performance.now();
   if(!priority && now-TTS.last<1100) return;  // 너무 잦은 중계 방지
   TTS.last=now;
-  try{
-    if(priority) speechSynthesis.cancel();
-    if(speechSynthesis.paused) speechSynthesis.resume();
-    const u=new SpeechSynthesisUtterance(text);
-    u.lang='ko-KR'; u.voice=(typeof CASTER_VOICE!=='undefined'&&CASTER_VOICE)||TTS.voice||null;
-    u.rate=1.12; u.pitch=1.12; u.volume=1.0;   // 들뜬 여성 캐스터 톤
-    speechSynthesis.speak(u);
-  }catch(e){}
+  playVoice(text, function(){        // mp3 없으면 TTS
+    if(!TTS.on) return;
+    try{
+      if(priority) speechSynthesis.cancel();
+      if(speechSynthesis.paused) speechSynthesis.resume();
+      const u=new SpeechSynthesisUtterance(text);
+      u.lang='ko-KR'; u.voice=(typeof CASTER_VOICE!=='undefined'&&CASTER_VOICE)||TTS.voice||null;
+      u.rate=1.12; u.pitch=1.12; u.volume=1.0;
+      speechSynthesis.speak(u);
+    }catch(e){}
+  });
 }
 function stopTTS(){ if(TTS.on){ try{speechSynthesis.cancel();}catch(e){} } }
 // 상황별 멘트 풀
@@ -2172,7 +2191,8 @@ function assignVoices(){
 function loadVoices(){ try{_voices=speechSynthesis.getVoices()||[];}catch(e){_voices=[];} assignVoices(); }
 if('speechSynthesis' in window){ loadVoices(); try{speechSynthesis.addEventListener('voiceschanged',loadVoices);}catch(e){} }
 function speakAs(d,text){
-  if(muted||!('speechSynthesis' in window))return;
+  if(muted)return;
+  playVoice(text, function(){ if(!('speechSynthesis' in window))return;
   try{
     if(speechSynthesis.paused) speechSynthesis.resume();
     const u=new SpeechSynthesisUtterance(text), v=DRIVER_VOICE[d];
@@ -2184,6 +2204,7 @@ function speakAs(d,text){
     u.volume=1;
     speechSynthesis.speak(u);
   }catch(e){}
+  });
 }
 function faceStyle(el,driver,expr){
   const col=(driver%2)*4+expr, row=Math.floor((driver%8)/2);
@@ -2208,6 +2229,29 @@ const LINES={
 };
 function rivalSay(r,kind){ const L=LINES[kind]; if(!L||!r)return; showFace('R', r.driver%8, L.e, pick(L.t)); }
 function playerSay(kind){ const L=LINES[kind]; if(!L)return; showFace('L', G.playerDriver, L.e, pick(L.t)); }
+
+// ====== 음성 매니페스트 (mp3 우선, 없으면 TTS) ======
+const CROWD_LINES=['와! 배트맨이다!','와! 스파이더맨이다!','우와, 슈퍼맨이다!','저기 봐, UFO다!','조커잖아, 도망쳐!'];
+const JOKER_LINE='하하하하! 비켜라!';
+const VOICE_MANIFEST=[], LINE_FILE={};
+(function(){
+  function add(cat,charType,text,file){ if(LINE_FILE[text]) return; LINE_FILE[text]=file; VOICE_MANIFEST.push({cat,charType,text,file}); }
+  for(const k in SAY) SAY[k].forEach((t,i)=>add('중계','중계(여성)',t,'cast_'+k.toLowerCase()+'_'+(i+1)+'.mp3'));
+  for(const k in LINES) LINES[k].t.forEach((t,i)=>add('대사','라이벌/플레이어',t,'line_'+k.toLowerCase()+'_'+(i+1)+'.mp3'));
+  CROWD_LINES.forEach((t,i)=>add('군중','길가 사람들',t,'crowd_'+(i+1)+'.mp3'));
+  add('조커','조커(UFO)',JOKER_LINE,'joker_1.mp3');
+})();
+const VOICE_DIR='voice/', _voiceAudio={};
+function playVoice(text, ttsFn){   // mp3 파일이 있으면 mp3, 없으면 TTS
+  if(muted) return;
+  const file=LINE_FILE[text];
+  if(!file || _voiceAudio[file]===false){ if(ttsFn)ttsFn(); return; }
+  let a=_voiceAudio[file];
+  if(!a){ a=new Audio(VOICE_DIR+file); a.volume=1; _voiceAudio[file]=a; }
+  try{ a.currentTime=0; }catch(e){}
+  const pr=a.play();
+  if(pr&&pr.catch) pr.catch(()=>{ _voiceAudio[file]=false; if(ttsFn)ttsFn(); });   // 파일 없으면 TTS
+}
 
 // ====== 아이템 슬롯 / 사용 ======
 function updateItemHud(){ for(let i=0;i<2;i++){ const ic=$('iicon'+i); if(ic) ic.textContent=G.items[i]?itemIcon(G.items[i]):''; } }
@@ -2512,6 +2556,29 @@ function updateCameos(dt, now){
     etBike.position.set(moon.position.x-55+pr*110, moon.position.y-4+Math.sin(pr*Math.PI)*7, moon.position.z+8);
     etBike.lookAt(camera.position);
     if(pr>=1){ etState.active=false; etBike.visible=false; etState.next=12+Math.random()*12; } }
+  // 조커 UFO (가끔 날아와 도로 근처로 — 부딪히면 충돌)
+  if(racing){ ufoState.next-=dt;
+    if(!ufoState.active && ufoState.next<=0){ ufoState.active=true; ufoState.t=0; ufo.visible=true; ufoState.startS=G.s+55; ufoState.lat=G.lat; cameoSay(JOKER_LINE); }
+    if(ufoState.active){ ufoState.t+=dt; const pr=Math.min(1,ufoState.t/6);
+      const s=ufoState.startS - pr*50; const p=sample(s);
+      ufoState.lat += (G.lat-ufoState.lat)*Math.min(1,dt*0.6);   // 플레이어 쪽으로 다이브
+      const y = 4 + 36*Math.pow(1-Math.sin(pr*Math.PI),2);        // 내려왔다 다시 올라감
+      ufo.position.set(p.x+Math.cos(p.h)*ufoState.lat, y, p.z+Math.sin(p.h)*ufoState.lat);
+      ufo.rotation.y += dt*2.5;
+      if(y<4.5 && G.mode==='race' && G.star<=0 && G.crashT<=0 && Math.abs(s-G.s)<5 && Math.abs(ufoState.lat-G.lat)<3){ startRollout(); }  // 충돌
+      if(ufoState.t>=6){ ufoState.active=false; ufo.visible=false; ufoState.next=11+Math.random()*12; }
+    }
+  } else if(ufo.visible) ufo.visible=false;
+  // 군중 반응 (배트맨/스파이더맨/UFO 등장 시 외침 + 음성)
+  if(racing){ cameoState.t-=dt;
+    if(cameoState.t<=0){
+      if(ufo.visible){ cameoState.t=5+Math.random()*4; cameoSay(Math.random()<.5?CROWD_LINES[3]:CROWD_LINES[4]); }
+      else if(spiderman.visible){ cameoState.t=5+Math.random()*4; cameoSay(CROWD_LINES[1]); }
+      else if(batCar.visible){ cameoState.t=5+Math.random()*4; cameoSay(CROWD_LINES[0]); }
+      else if(superman.visible){ cameoState.t=5+Math.random()*4; cameoSay(CROWD_LINES[2]); }
+      else cameoState.t=1.5;
+    }
+  }
 }
 
 // ---------- 메인 루프 ----------
@@ -2807,10 +2874,15 @@ function loop(now){
       camera.lookAt(focus.x, focus.y+1.2, focus.z);
       camera.fov=40;
     } else if(G.mode==='countdown'){
-      // 출발 전: 내 차 뒤에서 (차가 보이는 체이스 뷰)
-      camera.position.copy(drivePos);
-      camera.lookAt(driveLook);
-      camera.fov=driveFov;
+      if(G.countdown>2.0){
+        // 카운트 초반: 레이싱걸 확대(클로즈업)
+        const gp=raceGirl.position, gcp=sample(8);
+        camera.position.set(gcp.x+Math.cos(gcp.h)*(-1.7), gcp.y+1.85, gcp.z+Math.sin(gcp.h)*(-1.7));
+        camera.lookAt(gp.x, gp.y+1.7, gp.z); camera.fov=40;
+      } else {
+        // 출발 직전: 내 차 뒤 체이스(차가 보임)
+        camera.position.copy(drivePos); camera.lookAt(driveLook); camera.fov=driveFov;
+      }
     } else if(G.introCam>0){
       // GO 이후: 레이싱걸 클로즈업 → 주행뷰 줌아웃
       const gp=raceGirl.position, gcp=sample(8);
