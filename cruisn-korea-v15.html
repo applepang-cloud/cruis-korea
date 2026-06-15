@@ -1005,6 +1005,29 @@ function bodyGeoFor(type){
   _bodyGeoCache[type]=geo;
   return geo;
 }
+// 오픈카(컨버터블) 낮은 차체 — 지붕 없는 로드스터 실루엣 (플레이어 전용)
+const _convGeoCache={};
+function convBodyGeoFor(type){
+  if(_convGeoCache[type]) return _convGeoCache[type];
+  const D=CAR_DIMS[type]||CAR_DIMS.sport;
+  const L=D.bodyL, W=D.bodyW, hl=L/2;
+  const gc=Math.max(0.16, D.bodyY-D.bodyH/2-0.06);
+  const belt=D.bodyY+D.bodyH*0.30;
+  const hood=D.bodyY+D.bodyH*0.42;
+  const cowl=D.cabZ-D.cabL/2, deckB=D.cabZ+D.cabL/2;
+  const s=new T.Shape();
+  s.moveTo(-hl+0.2, gc);
+  s.lineTo(-hl, belt-0.05);
+  s.lineTo(-hl+0.15, hood);
+  s.quadraticCurveTo(cowl-0.3, hood+0.05, cowl, belt+0.08);   // 보닛 → 낮은 카울
+  s.lineTo(deckB, belt+0.08);                                  // 낮은 데크(지붕 없음)
+  s.lineTo(hl, belt-0.05);                                     // 트렁크/테일
+  s.lineTo(hl-0.2, gc);
+  s.closePath();
+  const geo=new T.ExtrudeGeometry(s,{depth:W-0.24, bevelEnabled:true, bevelThickness:0.1, bevelSize:0.1, bevelSegments:2, steps:1});
+  geo.translate(0,0,-(W-0.24)/2); geo.rotateY(-Math.PI/2); geo.computeVertexNormals();
+  _convGeoCache[type]=geo; return geo;
+}
 // 림/허브/스포크 있는 휠 (반지름별 지오 캐시)
 const _wheelCache={};
 function makeWheel(r, simple){
@@ -1096,20 +1119,22 @@ function buildCarMesh(spec){
   const bodyMat=new T.MeshLambertMaterial({color});
   const dark=new T.MeshLambertMaterial({color:0x1c1c22});
   const W=D.bodyW, L=D.bodyL, bodyY=D.bodyY, bodyH=D.bodyH, cabH=D.cabH, cabZ=D.cabZ, cabL=D.cabL;
-  // 곡면 차체
-  const body=new T.Mesh(bodyGeoFor(type),bodyMat); g.add(body);
+  // 오픈카(낮은 로드스터) 차체
+  const deck=bodyY+bodyH*0.30+0.08;     // 낮은 데크 상단 (지붕 없음)
+  const body=new T.Mesh(convBodyGeoFor(type),bodyMat); g.add(body);
   g.userData.bodyMat=bodyMat;          // 무적 무지개 연출용
-  // 오픈 콕핏(지붕 없음): 인테리어 + 낮은 윈드실드 + 헤드레스트 + 남녀 탑승
-  const tub=new T.Mesh(new T.BoxGeometry(W*0.78,0.32,cabL*0.95),new T.MeshLambertMaterial({color:0x16161e}));
-  tub.position.set(0, bodyY+bodyH/2-0.08, cabZ); g.add(tub);
-  const ws=new T.Mesh(new T.BoxGeometry(W*0.7,0.34,0.04),GLASS_MAT); ws.position.set(0, bodyY+bodyH/2+0.22, cabZ-cabL*0.42); ws.rotation.x=0.36; g.add(ws);
-  for(const sx of [-1,1]){ const hrst=new T.Mesh(new T.BoxGeometry(0.2,0.22,0.14),dark); hrst.position.set(sx*W*0.22, bodyY+bodyH/2+0.18, cabZ+cabL*0.4); g.add(hrst); }
-  const seatY=bodyY+bodyH/2-0.28;
+  // 오픈 콕핏: 인테리어 + 낮은 윈드실드 + 헤드레스트 + 남녀 탑승
+  const tub=new T.Mesh(new T.BoxGeometry(W*0.78,0.3,cabL*0.95),new T.MeshLambertMaterial({color:0x16161e}));
+  tub.position.set(0, deck-0.13, cabZ); g.add(tub);
+  const ws=new T.Mesh(new T.BoxGeometry(W*0.72,0.34,0.04),GLASS_MAT); ws.position.set(0, deck+0.2, cabZ-cabL*0.42); ws.rotation.x=0.36; g.add(ws);
+  for(const sx of [-1,1]){ const wpost=new T.Mesh(new T.BoxGeometry(0.04,0.36,0.05),CHROME); wpost.position.set(sx*W*0.34, deck+0.18, cabZ-cabL*0.42); wpost.rotation.x=0.36; g.add(wpost); } // 윈드실드 프레임
+  for(const sx of [-1,1]){ const hrst=new T.Mesh(new T.BoxGeometry(0.2,0.22,0.14),dark); hrst.position.set(sx*W*0.22, deck+0.14, cabZ+cabL*0.42); g.add(hrst); }
+  const seatY=deck-0.3;
   const man=makeOccupant(false,false);  man.position.set(-W*0.2, seatY, cabZ+0.05); g.add(man);
   const woman=makeOccupant(true,true);  woman.position.set( W*0.2, seatY, cabZ+0.05); g.add(woman);
   g.userData.waveArm=woman.userData.armR;
   // 식별: 보닛 3색 스트라이프 + 별 엠블럼(보닛) + 크롬 트림
-  const top=bodyY+bodyH/2+0.03;
+  const top=deck;
   const white=new T.MeshBasicMaterial({color:0xffffff}), red=new T.MeshBasicMaterial({color:0xe0263a}),
         gold=new T.MeshBasicMaterial({color:0xffd722,side:T.DoubleSide});
   g.add(new T.Mesh(new T.BoxGeometry(0.5,0.04,L*0.42),white).translateY(top).translateZ(-L*0.26));
@@ -2072,7 +2097,7 @@ function useItem(slot){
 }
 function resetRaceObjects(){
   G.items=[null,null]; G.star=0; G.boost=0; G.airT=0; G.airDur=0; G.airY=0;
-  G.rollT=0; G.spinT=0; G.slowAccelT=0;
+  G.rollT=0; G.spinT=0; G.slowAccelT=0; G._wasInvinc=false;
   G.playerDriver=CAR_DRIVER[G.car.key]||0;
   for(const b of bananas) scene.remove(b.mesh); bananas.length=0;
   for(const p of projectiles) scene.remove(p.mesh); projectiles.length=0;
@@ -2329,6 +2354,8 @@ function loop(now){
     if(!invinc&&!disabled) G.spd -= grade*22*dt;
     if(G.spd>cap) G.spd=Math.max(cap,G.spd-30*dt);
     if(invinc&&!disabled) G.spd=Math.max(G.spd, cap*0.96);   // 무적: 풀스피드 유지
+    if(G._wasInvinc && !invinc && racing){ G.spd*=0.55; G.slowAccelT=Math.max(G.slowAccelT,1.2); } // 무적 종료 → 고속 해제
+    G._wasInvinc = invinc;
     G.spd=Math.max(0,G.spd);
 
     const want=disabled?0:((input.L?-1:0)+(input.R?1:0));
