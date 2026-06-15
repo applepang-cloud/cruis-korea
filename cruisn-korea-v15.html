@@ -1190,17 +1190,15 @@ function rankTexture(n){ if(_rankTex[n]) return _rankTex[n];
   c.lineWidth=7; c.strokeStyle='#000'; c.strokeText(n,32,35);
   c.fillStyle=(n===1)?'#ffd722':'#ffffff'; c.fillText(n,32,35);
   const t=new T.CanvasTexture(cv); _rankTex[n]=t; return t; }
-function makeRankSprite(){ const s=new T.Sprite(new T.SpriteMaterial({map:rankTexture(8),depthTest:false}));
-  s.scale.set(2,2,1); s.position.set(0,3.6,0); s.renderOrder=6; return s; }
+function makeRankSprite(){ const s=new T.Sprite(new T.SpriteMaterial({map:rankTexture(8),transparent:true,depthWrite:false}));
+  s.scale.set(2,2,1); s.position.set(0,3.6,0); return s; }   // depthTest 기본 on → 지형에 가려짐
 
-// 플레이어 (기본 = La Bomba, SELECT CAR에서 변경 가능)
+// 플레이어 (기본 = La Bomba, SELECT CAR에서 변경 가능) — 내 차엔 순위 숫자 없음
 let player = buildCarMesh(CARS[0]);
 scene.add(player);
-player.userData.rankSprite=makeRankSprite(); player.add(player.userData.rankSprite);
 function setPlayerCar(spec){
   if(player) scene.remove(player);
   player = buildCarMesh(spec);
-  player.userData.rankSprite=makeRankSprite(); player.add(player.userData.rankSprite);
   scene.add(player);
 }
 // 무적 불꽃 이펙트
@@ -2413,10 +2411,9 @@ function loop(now){
       for(let i=0;i<order.length;i++){ const o=order[i], mesh=o.p?player:o.r.mesh, sp=mesh.userData.rankSprite;
         if(!sp) continue;
         sp.material.map=rankTexture(i+1);
-        const spun = o.p ? (G.rollT>0||G.spinT>0) : ((o.r.spin||0)>0);   // 회전 중 숨김
-        sp.visible = !spun;
-        const d = camera.position.distanceTo(mesh.position);             // 멀어도 보이게 거리비례 크게
-        const sc = Math.max(3.2, Math.min(15, d*0.2));
+        sp.visible = !((o.r.spin||0)>0);   // 회전 중 숨김 (라이벌만)
+        const d = camera.position.distanceTo(mesh.position);   // 가까이=작게, 멀리=크게
+        const sc = Math.max(1.2, Math.min(16, d*d*0.006));
         sp.scale.set(sc, sc, 1);
       } }
 
