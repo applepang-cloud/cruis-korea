@@ -1541,13 +1541,13 @@ function updateDebris(dtt){ for(let i=debris.length-1;i>=0;i--){ const d=debris[
 const _bulletGeo=new T.SphereGeometry(0.18,6,5), _bulletMat=new T.MeshBasicMaterial({color:0xffe24a});
 function spawnBullet(s,lat,owner){
   const m=new T.Mesh(_bulletGeo,_bulletMat); scene.add(m);
-  projectiles.push({s,lat,spd:200,homing:true,target:null,mesh:m,dist:0,t:0,owner:owner||'rival',smokeT:999});
+  projectiles.push({s,lat,spd:150,homing:false,target:null,mesh:m,dist:0,t:0,owner:owner||'rival',smokeT:999});  // 비유도(피할 수 있게)
 }
 function hitRival(r){ r.spin=Math.max(r.spin||0,2.2); r.spd=0; }
 function crushRival(r){ r.spin=Math.max(r.spin||0,1.6); r.crushed=1.6; r.spd=0; beep(120,.18,'square',.22); }  // 작은 차 찌그러짐
-function hitPlayer(){            // 라이벌 아이템에 맞음 → 스핀(전복 아님)
-  if(G.star>0||G.rollT>0||G.spinT>0||G.mode!=='race') return;
-  G.spinT=G.spinDur=1.3; G.spd*=0.35; G.shakeT=.5; G.slowAccelT=2.0;
+function hitPlayer(){            // 라이벌 아이템/갱 총알에 맞음 → 스핀(전복 아님)
+  if(G.star>0||G.rollT>0||G.spinT>0||G.hitGraceT>0||G.mode!=='race') return;
+  G.spinT=G.spinDur=1.3; G.spd*=0.4; G.shakeT=.5; G.slowAccelT=1.5; G.hitGraceT=3.0;  // 피격 후 3초 무적
   beep(140,.3,'sawtooth',.3); flashScreen('#ffaa22',.25); playerSay('shock');
 }
 
@@ -1561,10 +1561,11 @@ const COURSES=[
 let TOTAL_LAPS=3;   // 코스 시작 시 COURSES[c].laps로 설정
 // 난이도 (이지=현재, 하드=적 빠름, 수퍼하드=더 빠름+아이템 공격↑)
 // fillMin/fillRand = 라이벌이 아이템을 다시 "획득"하는 간격(초). 길수록 공격이 뜸함.
+// catchup/catchK = 뒤처졌을 때 추격 가속(클수록 바짝 붙음). fillMin/fillRand = 아이템 재획득 간격.
 const DIFF_SETTINGS={
-  easy:      {label:'EASY',       speed:1.0,  fillMin:18, fillRand:8},
-  hard:      {label:'HARD',       speed:1.12, fillMin:12, fillRand:6},
-  superhard: {label:'SUPER HARD', speed:1.22, fillMin:8,  fillRand:5},
+  easy:      {label:'EASY',       speed:1.0,  catchup:18, catchK:0.05, fillMin:18, fillRand:8},
+  hard:      {label:'HARD',       speed:1.12, catchup:32, catchK:0.085,fillMin:12, fillRand:6},
+  superhard: {label:'SUPER HARD', speed:1.22, catchup:40, catchK:0.11, fillMin:5,  fillRand:4},
 };
 let gameDiff='easy';
 function DIFF(){ return DIFF_SETTINGS[gameDiff]||DIFF_SETTINGS.easy; }
@@ -1586,6 +1587,7 @@ const G={
   airT:0, airDur:0, airY:0, // 점프
   rollT:0, rollDur:0,    // 강한 충돌 롤아웃(구르기)
   spinT:0, spinDur:0,    // 아이템 피격 스핀(전복 아님)
+  hitGraceT:0,           // 피격 후 무적시간(연속 피격 방지)
   slowAccelT:0,          // 충돌 후 천천히 가속
   tauntT:6,              // 라이벌 도발 타이머
   playerDriver:0,
@@ -2238,7 +2240,7 @@ function useItem(slot){
 }
 function resetRaceObjects(){
   G.items=[null,null]; G.star=0; G.boost=0; G.airT=0; G.airDur=0; G.airY=0;
-  G.rollT=0; G.spinT=0; G.slowAccelT=0; G._wasInvinc=false;
+  G.rollT=0; G.spinT=0; G.slowAccelT=0; G.hitGraceT=0; G._wasInvinc=false;
   G.playerDriver=CAR_DRIVER[G.car.key]||0;
   for(const b of bananas) scene.remove(b.mesh); bananas.length=0;
   for(const p of projectiles) scene.remove(p.mesh); projectiles.length=0;
@@ -2456,9 +2458,15 @@ function updateGang(dt, now){
   gangState.lat += ((G.lat+Math.sin(now*0.0016)*3)-gangState.lat)*Math.min(1,dt*2);
   place(gangCar, Math.max(gangState.s,0), gangState.lat, 0);
   gangState.shootT-=dt;
-  if(gangState.shootT<=0 && G.star<=0){ gangState.shootT=1.4+Math.random()*1.4;
-    spawnBullet(gangState.s+3, gangState.lat, 'rival'); beep(900,.05,'square',.18);
-    if(Math.random()<.35) rivalSay(rivals[0],'taunt'); }
+  if(gangState.shootT<=0){
+    const gap=G.s-gangState.s;   // 앞(사정권)에 플레이어가 있을 때만 발사
+    const inSight = gap>5 && gap<55 && Math.abs(G.lat-gangState.lat)<5;
+    if(inSight && G.star<=0 && G.hitGraceT<=0){
+      gangState.shootT=6+Math.random()*4;   // 발사 간격↑
+      spawnBullet(gangState.s+3, G.lat, 'rival'); beep(900,.05,'square',.18);  // 비유도, 현재 차선 조준
+      if(Math.random()<.3) rivalSay(rivals[0],'taunt');
+    } else gangState.shootT=0.6;   // 사정권 밖이면 발사 안 하고 잠시 후 재확인
+  }
 }
 // 카메오들 (스파이더맨·배트맨카·슈퍼맨·달·ET)
 function updateCameos(dt, now){
@@ -2556,7 +2564,7 @@ function loop(now){
 
     // --- 플레이어 물리 (차량 성능 + 부스트/무적/점프 반영) ---
     const car = G.car || CARS[0];
-    if(racing){ if(G.boost>0)G.boost-=dt; if(G.star>0)G.star-=dt; if(G.rollT>0)G.rollT-=dt; if(G.spinT>0)G.spinT-=dt; }
+    if(racing){ if(G.boost>0)G.boost-=dt; if(G.star>0)G.star-=dt; if(G.rollT>0)G.rollT-=dt; if(G.spinT>0)G.spinT-=dt; if(G.hitGraceT>0)G.hitGraceT-=dt; }
     const boosting=G.boost>0, invinc=G.star>0, airborne=G.airT>0, rolling=G.rollT>0, spinning=G.spinT>0, disabled=rolling||spinning;
     const offRoad = Math.abs(G.lat)>ROAD_W/2-1;
     const grade = slope(G.s);
@@ -2672,7 +2680,8 @@ function loop(now){
           if((r.slowAccelT||0)>0) r.slowAccelT-=dt;
           const ramp=(r.slowAccelT||0)>0? 0.3 : 0.9;   // 충돌 후 저가속
           const gap=playerTotal()-rivalTotal(r);
-          let target=(r.base*G.diff*DIFF().speed)*(shrunk?0.45:1) + Math.max(-8,Math.min(20, gap*.045));  // 난이도·뒤처짐 반영
+          const DS=DIFF();
+          let target=(r.base*G.diff*DS.speed)*(shrunk?0.45:1) + Math.max(-8, Math.min(DS.catchup, gap*DS.catchK));  // 난이도·뒤처지면 바짝 추격
           r.spd = r.spd + (target-r.spd)*dt*ramp;
           r.spd -= slope(r.s)*18*dt;
           r.s += Math.max(0,r.spd)*dt;
