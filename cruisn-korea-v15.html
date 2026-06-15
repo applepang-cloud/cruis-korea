@@ -44,7 +44,7 @@
   #hud-speed{position:fixed;left:18px;bottom:16px;line-height:.9}
   #hud-speed .num{font-size:clamp(44px,9vw,84px)}
   #hud-speed .unit{font-size:clamp(14px,2.6vw,22px);color:#fff}
-  #hud-time{position:fixed;top:12px;left:50%;transform:translateX(-50%);text-align:center;z-index:12}
+  #hud-time{position:fixed;top:calc(12vh + 20px);left:50%;transform:translateX(-50%);text-align:center;z-index:12}
   #hud-time .lbl{font-size:clamp(11px,2vw,16px);color:#fff}
   #hud-time .num{font-size:clamp(36px,7vw,64px);color:var(--arcade-yellow)}
   #hud-time.danger .num{color:var(--arcade-red);animation:blink .4s steps(1) infinite}
@@ -63,7 +63,7 @@
   /* 드라이버 얼굴 + 말풍선 */
   .facebox{position:fixed;top:34%;display:none;align-items:flex-end;gap:8px;z-index:13}
   .facebox.on{display:flex}
-  .facebox.right{right:14px;flex-direction:row}
+  .facebox.right{right:14px;top:13%;flex-direction:row}   /* 우측 미니맵 위쪽 */
   .facebox:not(.right){left:14px;flex-direction:row-reverse}
   .face{width:clamp(72px,15vw,104px);height:clamp(96px,20vw,138px);background-image:url(drivers.png);background-repeat:no-repeat;border:3px solid #ffffffcc;border-radius:10px;box-shadow:0 4px 10px #0009;background-color:#10142a;flex-shrink:0}
   .bubble{max-width:46vw;background:#fff;color:#111;font-weight:900;font-style:italic;font-size:clamp(13px,3vw,22px);padding:8px 14px;border-radius:16px;position:relative;box-shadow:0 3px 8px #0007;white-space:nowrap}
@@ -1066,11 +1066,17 @@ function buildCarMesh(spec){
   // 글래스 캐노피 (윈드실드+사이드+리어)
   const cab=new T.Mesh(new T.BoxGeometry(W*0.84, cabH*0.9, cabL*0.92),GLASS_MAT);
   cab.position.set(0, bodyY+bodyH/2+cabH*0.45, cabZ); g.add(cab);
-  // 내 차 식별: 흰 레이싱 스트라이프 2줄 + 루프 엠블럼
-  const white=new T.MeshBasicMaterial({color:0xffffff});
-  for(const sx of [-0.34,0.34]){ const st=new T.Mesh(new T.BoxGeometry(0.26,0.04,L*0.86),white); st.position.set(sx, bodyY+bodyH/2+0.03, 0); g.add(st); }
-  const emblem=new T.Mesh(new T.CircleGeometry(0.42,5),new T.MeshBasicMaterial({color:0xffd722,side:T.DoubleSide}));
-  emblem.rotation.x=-Math.PI/2; emblem.rotation.z=Math.PI/10; emblem.position.set(0, bodyY+bodyH/2+cabH+0.04, cabZ); g.add(emblem);
+  // 내 차 식별: 화려한 3색 레이싱 스트라이프 + 별 엠블럼 + 크롬 트림
+  const top=bodyY+bodyH/2+0.03, roofY=bodyY+bodyH/2+cabH;
+  const white=new T.MeshBasicMaterial({color:0xffffff}), red=new T.MeshBasicMaterial({color:0xe0263a}),
+        blue=new T.MeshBasicMaterial({color:0x2a6bff}), gold=new T.MeshBasicMaterial({color:0xffd722,side:T.DoubleSide});
+  g.add(new T.Mesh(new T.BoxGeometry(0.5,0.04,L*0.9),white).translateY(top));
+  for(const sx of [-0.4,0.4]) g.add(new T.Mesh(new T.BoxGeometry(0.14,0.045,L*0.9),red).translateX(sx).translateY(top));
+  for(const sx of [-0.62,0.62]) g.add(new T.Mesh(new T.BoxGeometry(0.07,0.045,L*0.85),blue).translateX(sx).translateY(top));
+  const star=new T.Shape(); for(let i=0;i<10;i++){ const a=Math.PI/5*i-Math.PI/2, rad=(i%2===0)?0.5:0.21, sxp=Math.cos(a)*rad, syp=Math.sin(a)*rad; if(i)star.lineTo(sxp,syp); else star.moveTo(sxp,syp); } star.closePath();
+  const ring=new T.Mesh(new T.RingGeometry(0.52,0.64,18),new T.MeshBasicMaterial({color:0x101018,side:T.DoubleSide})); ring.rotation.x=-Math.PI/2; ring.position.set(0, roofY+0.045, cabZ); g.add(ring);
+  const starM=new T.Mesh(new T.ShapeGeometry(star),gold); starM.rotation.x=-Math.PI/2; starM.position.set(0, roofY+0.06, cabZ); g.add(starM);
+  for(const sx of [-1,1]) g.add(new T.Mesh(new T.BoxGeometry(0.04,0.06,L*0.7),CHROME).translateX(sx*(W/2+0.005)).translateY(bodyY+bodyH*0.45));
   // A/C 필러(기둥)
   for(const sx of [-1,1]){
     const pil=new T.Mesh(new T.BoxGeometry(.08,cabH*0.95,.1),bodyMat);
@@ -1227,7 +1233,7 @@ function rankTexture(n){ if(_rankTex[n]) return _rankTex[n];
   c.fillStyle=(n===1)?'#ffd722':'#ffffff'; c.fillText(n,32,35);
   const t=new T.CanvasTexture(cv); _rankTex[n]=t; return t; }
 function makeRankSprite(){ const s=new T.Sprite(new T.SpriteMaterial({map:rankTexture(8),transparent:true,depthWrite:false}));
-  s.scale.set(2,2,1); s.position.set(0,3.6,0); return s; }   // depthTest 기본 on → 지형에 가려짐
+  s.scale.set(2,2,1); s.position.set(0,4.6,0); return s; }   // 차 위쪽 / depthTest 기본 on → 지형에 가려짐
 
 // 플레이어 (기본 = La Bomba, SELECT CAR에서 변경 가능) — 내 차엔 순위 숫자 없음
 let player = buildCarMesh(CARS[0]);
@@ -1903,6 +1909,14 @@ function whoosh(){ if(!AC||muted)return; const o=AC.createOscillator(),g=AC.crea
   g.gain.setValueAtTime(.22,AC.currentTime); g.gain.exponentialRampToValueAtTime(.001,AC.currentTime+0.45);
   o.connect(g); g.connect(AC.destination); o.start(); o.stop(AC.currentTime+0.5); }
 function jingle(arr){ if(!AC||muted)return; arr.forEach(function(f,i){ setTimeout(function(){ beep(f,.14,'square',.2); }, i*70); }); }
+function bangSound(){ if(!AC||muted)return;
+  const o=AC.createOscillator(),g=AC.createGain();
+  o.type='square'; o.frequency.setValueAtTime(190,AC.currentTime); o.frequency.exponentialRampToValueAtTime(48,AC.currentTime+0.16);
+  g.gain.setValueAtTime(.0001,AC.currentTime); g.gain.linearRampToValueAtTime(.5,AC.currentTime+.008); g.gain.exponentialRampToValueAtTime(.001,AC.currentTime+0.26);
+  o.connect(g); g.connect(AC.destination); o.start(); o.stop(AC.currentTime+0.3);
+  const len=Math.floor(AC.sampleRate*0.16), b=AC.createBuffer(1,len,AC.sampleRate), d=b.getChannelData(0);
+  for(let i=0;i<len;i++) d[i]=(Math.random()*2-1)*Math.pow(1-i/len,2);
+  const src=AC.createBufferSource(); src.buffer=b; const ng=AC.createGain(); ng.gain.value=.45; src.connect(ng); ng.connect(AC.destination); src.start(); }
 function thunderSound(){ if(!AC||muted)return; const o=AC.createOscillator(),g=AC.createGain();
   o.type='sawtooth'; o.frequency.setValueAtTime(70,AC.currentTime); o.frequency.exponentialRampToValueAtTime(30,AC.currentTime+0.9);
   g.gain.setValueAtTime(.0001,AC.currentTime); g.gain.linearRampToValueAtTime(.4,AC.currentTime+.04); g.gain.exponentialRampToValueAtTime(.001,AC.currentTime+1.1);
@@ -2160,13 +2174,17 @@ function drawMinimap(){
   c.strokeStyle='#3a4a66'; c.lineWidth=10; c.lineCap='round'; c.beginPath(); c.moveTo(cx,14); c.lineTo(cx,H-14); c.stroke();
   c.fillStyle='#9fb0d8'; c.font='bold 10px sans-serif'; c.textAlign='center'; c.fillText('▲', cx, 11);
   const pt=playerTotal();
+  // 순위 계산
+  const all=[{p:1,t:pt}]; for(const r of rivals) all.push({p:0,r:r,t:rivalTotal(r)});
+  all.sort((a,b)=>b.t-a.t); const rankOf=new Map(); all.forEach((o,i)=>{ if(!o.p) rankOf.set(o.r,i+1); });
   for(const r of rivals){ const gap=rivalTotal(r)-pt;
     const y=cy - (Math.max(-RANGE,Math.min(RANGE,gap))/RANGE)*halfPx;
-    c.fillStyle='#ffd722'; c.beginPath(); c.arc(cx,y,5,0,6.3); c.fill();
-    if(Math.abs(gap)<RANGE){ c.fillStyle='#fff'; c.font='8px sans-serif'; c.textAlign='left'; c.fillText(Math.round(Math.abs(gap))+'m', cx+9, y+3); }
+    c.fillStyle='#ffd722'; c.beginPath(); c.arc(cx,y,7,0,6.3); c.fill();
+    c.fillStyle='#1a1a22'; c.font='bold 9px sans-serif'; c.textAlign='center'; c.textBaseline='middle'; c.fillText(rankOf.get(r), cx, y);  // 순위
+    if(Math.abs(gap)<RANGE){ c.fillStyle='#fff'; c.font='8px sans-serif'; c.textAlign='left'; c.fillText(Math.round(Math.abs(gap))+'m', cx+10, y); }
   }
   c.fillStyle='#ff3b30'; c.beginPath(); c.arc(cx,cy,7,0,6.3); c.fill();
-  c.strokeStyle='#fff'; c.lineWidth=2; c.stroke();
+  c.strokeStyle='#fff'; c.lineWidth=2; c.stroke(); c.textBaseline='alphabetic';
 }
 
 // ---------- 메인 루프 ----------
@@ -2260,7 +2278,7 @@ function loop(now){
       const ds=t.s-G.s;
       if(ds>-3 && ds<4 && Math.abs(t.lat-G.lat)<2.2){
         const dlat=t.lat-G.lat, headOn=Math.abs(dlat)<0.95;
-        if(invinc){ t.s=200; G.shakeT=.15; beep(320,.08); }          // 무적: 튕겨냄
+        if(invinc){ t.s=200; G.shakeT=.3; bangSound(); }             // 무적: 쾅! 튕겨냄
         else if(headOn && G.crashT<=0 && G.spd>ROLL_SPD){ startRollout(); }   // 200km/h↑ 정면만 전복
         else if(headOn && G.crashT<=0 && G.spd>t.spd+1){             // 정면 반동(전복 X)
           G.spd*=0.55; G.crashT=0.7; G.shakeT=.4; G.slowAccelT=1.5; G.lat += (G.lat>=t.lat?1:-1)*1.6;
@@ -2277,7 +2295,7 @@ function loop(now){
       const ds=r.s-G.s, dlat=r.lat-G.lat, headOn=Math.abs(dlat)<0.9;
       if(ds>-3.2 && ds<4 && Math.abs(dlat)<2.6){
         if((r.shrink||0)>0){ crushRival(r); continue; }   // 작아진 차만 찌그러짐 (나는 멀쩡)
-        if(invinc){ if(G.crashT<=0){ hitRival(r); rivalSay(r,'shock'); G.crashT=.3; G.shakeT=.2; beep(320,.1); } }
+        if(invinc){ if(G.crashT<=0){ hitRival(r); rivalSay(r,'shock'); G.crashT=.3; G.shakeT=.35; bangSound(); } }  // 무적: 쾅!
         else if(headOn && G.crashT<=0 && G.spd>ROLL_SPD){ startRollout(); hitRival(r); }  // 200km/h↑ 정면만 전복
         else if(headOn && G.crashT<=0){ G.spd*=0.6; G.crashT=0.55; G.shakeT=.35; G.slowAccelT=1.5; G.lat += (G.lat>=r.lat?1:-1)*1.4; hitRival(r); beep(160,.14,'sawtooth',.2); }  // 정면 반동
         else { // 측면 → 서로 밀침
