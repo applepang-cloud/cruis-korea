@@ -193,7 +193,7 @@
   #story-portrait,#story-portrait2{position:absolute;z-index:2;bottom:23vh;border:4px solid #fff;border-radius:14px;box-shadow:0 12px 34px #000b;background:#10142a no-repeat;background-image:url(drivers.png);transition:opacity .22s,filter .22s}
   #story-portrait{left:4vw}
   #story-portrait2{right:4vw;transform:scaleX(-1)}
-  #story-portrait.dim,#story-portrait2.dim{opacity:.5;filter:grayscale(.55) brightness(.6)}
+  #story-portrait.dim,#story-portrait2.dim{opacity:.82;filter:brightness(.72)}
   #story-box{position:relative;z-index:3;margin:0 auto 5vh;width:min(880px,92vw);background:#0b1030f0;border:3px solid #ffd722;border-radius:16px;padding:14px 22px 12px;box-shadow:0 8px 28px #000a}
   #story-name{display:inline-block;background:#ffd722;color:#10142a;font-weight:900;font-size:clamp(14px,3vw,20px);padding:3px 14px;border-radius:8px;margin-bottom:8px}
   #story-text{color:#fff;font-size:clamp(15px,3.4vw,23px);font-weight:700;line-height:1.5;min-height:2.7em}
@@ -1833,7 +1833,7 @@ function maybeShowNewtab(){
 }
 
 // ---------- 레이싱 음악 (스텝 시퀀서) ----------
-let musicGain=null, musicTimer=null, musicStep=0;
+let musicGain=null, musicTimer=null, musicStep=0, fadeStopTimer=null;
 const MUSIC_VOL=0.5;
 // 맵별 트랙: bpm, 베이스 진행(주파수), 리드 아르페지오(반음 오프셋), 드럼 스타일
 const N={C2:65.41,D2:73.42,E2:82.41,F2:87.31,G2:98,A2:110,B2:123.47,
@@ -1851,6 +1851,10 @@ const TRACKS={
   beach:{ bpm:122, drive:'minor',
     bass:[N.D2,N.D2,N.A2,N.A2,N.B2,N.B2,N.G2,N.G2],
     lead:[N.D4,N.F4,N.A4,N.D4,N.C4,N.A4,N.F4,N.A4, N.B4,N.D4,N.F4,N.B4,N.G3,N.B2,N.D4,N.A3],
+    leadType:'triangle', pad:true },
+  lobby:{ bpm:96, drive:'major',     // 홈/메뉴 로비 음악 (잔잔)
+    bass:[N.C2,N.C2,N.G2,N.G2,N.A2,N.A2,N.F2,N.F2],
+    lead:[N.E4,N.G4,N.C5,N.G4, N.D4,N.G4,N.B4,N.G4, N.A3,N.C4,N.E4,N.C4, N.F4,N.A4,N.C5,N.A4],
     leadType:'triangle', pad:true }
 };
 let curTrack=TRACKS.suburb;
@@ -1914,6 +1918,7 @@ function musicTick(){
 }
 function startMusic(mapKey){
   if(!AC) return;
+  if(fadeStopTimer){ clearTimeout(fadeStopTimer); fadeStopTimer=null; }   // 페이드 정지 예약 취소
   curTrack = TRACKS[mapKey]||TRACKS.suburb;
   if(!musicGain){ musicGain=AC.createGain(); musicGain.connect(AC.destination); }
   musicGain.gain.value = muted?0:MUSIC_VOL;
@@ -1924,9 +1929,11 @@ function startMusic(mapKey){
 function stopMusic(){ if(musicTimer){clearTimeout(musicTimer);musicTimer=null;} }
 function fadeMusic(){ // 결승선/게임오버 시 페이드
   if(musicGain){ const t=AC.currentTime; musicGain.gain.setValueAtTime(musicGain.gain.value,t);
-    musicGain.gain.linearRampToValueAtTime(0,t+1.2);} 
-  setTimeout(stopMusic,1300);
+    musicGain.gain.linearRampToValueAtTime(0,t+1.2);}
+  if(fadeStopTimer) clearTimeout(fadeStopTimer);
+  fadeStopTimer=setTimeout(stopMusic,1300);
 }
+function startLobby(){ if(AC) startMusic('lobby'); }   // 홈/메뉴 로비 음악
 
 
 // ---------- UI 참조 ----------
@@ -2151,7 +2158,7 @@ function updateResultBtn(){
   const b=$('res-btn');
   b.textContent = resultMode==='advance'?'NEXT COURSE ▶' : resultMode==='champion'?'BACK TO TITLE' : resultMode==='free'?'🗺️ 맵 선택':'RETRY';
 }
-function backToTitle(){ G.mode='title'; titleEl.style.display='flex'; ui.hud.classList.remove('on'); showPauseBtn(false); G.storyMode=false; G.storyChar=-1; }
+function backToTitle(){ G.mode='title'; titleEl.style.display='flex'; ui.hud.classList.remove('on'); showPauseBtn(false); G.storyMode=false; G.storyChar=-1; startLobby(); }
 $('res-btn').addEventListener('click',()=>{
   ui.result.classList.remove('on');
   const rp=$('replay'); if(rp) rp.classList.remove('on');
@@ -2446,11 +2453,12 @@ function stRender(b){
   $('story-emoji').textContent=SCENE_EMOJI[b.scene]||'';
   const pL=$('story-portrait'), pR=$('story-portrait2'), nm=$('story-name'), tx=$('story-text');
   if(typeof b.who==='number' && b.who!==_stHero) _stOther=b.who;   // 새 상대 캐릭터 등장
-  // 왼쪽: 주인공(컷신 내내 항상 표시)
-  if(_stHero>=0){ pL.style.display=''; portraitStyle(pL,_stHero,(b.who===_stHero?(b.expr||0):0),1.5); pL.classList.toggle('dim', b.who!==_stHero); }
+  const heroSpk=(b.who===_stHero), otherSpk=(typeof b.who==='number' && b.who===_stOther);
+  // 왼쪽: 주인공(컷신 내내 항상 표시) — 상대가 말할 때만 흐리게(내레이션이면 선명)
+  if(_stHero>=0){ pL.style.display=''; portraitStyle(pL,_stHero,(heroSpk?(b.expr||0):0),1.5); pL.classList.toggle('dim', otherSpk); }
   else pL.style.display='none';
-  // 오른쪽: 상대(등장한 뒤부터 표시)
-  if(_stOther>=0){ pR.style.display=''; portraitStyle(pR,_stOther,(b.who===_stOther?(b.expr||0):0),1.5); pR.classList.toggle('dim', b.who!==_stOther); }
+  // 오른쪽: 상대(등장한 뒤부터 표시) — 주인공이 말할 때만 흐리게
+  if(_stOther>=0){ pR.style.display=''; portraitStyle(pR,_stOther,(otherSpk?(b.expr||0):0),1.5); pR.classList.toggle('dim', heroSpk); }
   else pR.style.display='none';
   nm.textContent=(typeof b.who==='number')?(DRIVER_NAMES[b.who]||''):'내레이션';
   tx.textContent=b.text||'';
@@ -2574,6 +2582,15 @@ $('p-resume').addEventListener('click',e=>{ e.stopPropagation(); resumeGame(); }
 $('p-restart').addEventListener('click',e=>{ e.stopPropagation(); resumeGame(); startCourse(G.course); });
 $('p-home').addEventListener('click',e=>{ e.stopPropagation(); goHome(); });
 $('res-home').addEventListener('click',e=>{ e.stopPropagation(); goHome(); });
+// 최초 사용자 입력 시 오디오 깨우고 로비 음악 시작 (브라우저 자동재생 정책)
+let _audioWoke=false;
+function _wakeLobby(){
+  if(_audioWoke) return; _audioWoke=true;
+  audioInit(); if(AC&&AC.state==='suspended'){ try{AC.resume();}catch(e){} }
+  if(['title','carselect','select','charselect','story'].indexOf(G.mode)>=0) startLobby();
+}
+addEventListener('pointerdown', _wakeLobby);
+addEventListener('keydown', _wakeLobby);
 
 // ====== 아이템 슬롯 / 사용 ======
 function updateItemHud(){ for(let i=0;i<2;i++){ const ic=$('iicon'+i); if(ic) ic.textContent=G.items[i]?itemIcon(G.items[i]):''; } }
