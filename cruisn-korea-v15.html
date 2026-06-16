@@ -155,6 +155,37 @@
   .diff-btn.sel{color:#222;background:linear-gradient(180deg,#ffe24a,#ffb01e);border-color:#fff;box-shadow:0 3px 0 #5e0f0a}
   #freemode-btn{cursor:pointer;pointer-events:auto;color:#fff;font:900 italic clamp(13px,2.6vw,20px) Arial;padding:8px 20px;border:3px solid #2ad8ff;border-radius:24px;background:linear-gradient(180deg,#1a6fae,#0d3a6e);box-shadow:0 4px 0 #062239;transform:skewX(-8deg)}
   #freemode-btn:active{transform:skewX(-8deg) translateY(3px);box-shadow:0 1px 0 #062239}
+  #story-btn{cursor:pointer;pointer-events:auto;color:#10142a;font:900 italic clamp(13px,2.6vw,20px) Arial;padding:8px 20px;border:3px solid #ffe87a;border-radius:24px;background:linear-gradient(180deg,#ffd722,#e0a400);box-shadow:0 4px 0 #7a5a00;transform:skewX(-8deg);margin-top:6px}
+  #story-btn:active{transform:skewX(-8deg) translateY(3px);box-shadow:0 1px 0 #7a5a00}
+  /* ===== 스토리: 캐릭터 선택 ===== */
+  #charsel{position:fixed;inset:0;z-index:35;display:none;flex-direction:column;align-items:center;justify-content:center;background:radial-gradient(circle at 50% 30%,#15244f,#070a1e 80%)}
+  #charsel.on{display:flex}
+  #char-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;width:min(860px,94vw);margin:14px 0}
+  .charcard{background:#121736;border:3px solid #2a356b;border-radius:12px;padding:8px 6px;text-align:center;cursor:pointer;transition:transform .1s,border-color .1s}
+  .charcard:hover{transform:translateY(-4px);border-color:#ffd722}
+  .charcard .cport{margin:0 auto;border-radius:8px;background:#10142a no-repeat;background-image:url(drivers.png)}
+  .charcard .cname{color:#fff;font-weight:900;font-size:15px;margin-top:6px}
+  .charcard .csex{font-size:11px;font-weight:800}
+  .charcard .csex.m{color:#5b8cff}.charcard .csex.f{color:#ff7ac0}
+  .charcard .ctag{color:#aab4e0;font-size:10.5px;margin-top:3px;line-height:1.3;min-height:2.6em}
+  #char-back{cursor:pointer;pointer-events:auto;color:#cfe0ff;font-weight:800;font-size:14px;margin-top:8px;border:2px solid #ffffff33;border-radius:18px;padding:6px 16px}
+  /* ===== 스토리: 컷신 ===== */
+  #story{position:fixed;inset:0;z-index:40;display:none;flex-direction:column;justify-content:flex-end;overflow:hidden;cursor:pointer}
+  #story.on{display:flex}
+  #story-scene{position:absolute;inset:0;z-index:0}
+  #story-scene.suburb{background:linear-gradient(#7ec8ff,#bfe9ff 52%,#6cc24a 52%,#3f8f37)}
+  #story-scene.city{background:linear-gradient(#0a0a2e,#241b4d 58%,#3a2a5e)}
+  #story-scene.beach{background:linear-gradient(#2c2840,#534a6e 48%,#3b6b86 54%,#22414f)}
+  #story-scene.podium{background:linear-gradient(#2a1a4a,#7a3fa0 58%,#ffcf4d)}
+  #story-emoji{position:absolute;inset:0;z-index:1;font-size:clamp(48px,12vw,96px);opacity:.2;display:flex;align-items:flex-start;justify-content:space-around;padding-top:8vh;pointer-events:none}
+  #story-portrait{position:absolute;z-index:2;bottom:24vh;left:7vw;border:4px solid #fff;border-radius:14px;box-shadow:0 12px 34px #000b;background:#10142a no-repeat;background-image:url(drivers.png)}
+  #story-portrait.narr{display:none}
+  #story-box{position:relative;z-index:3;margin:0 auto 5vh;width:min(880px,92vw);background:#0b1030f0;border:3px solid #ffd722;border-radius:16px;padding:14px 22px 12px;box-shadow:0 8px 28px #000a}
+  #story-name{display:inline-block;background:#ffd722;color:#10142a;font-weight:900;font-size:clamp(14px,3vw,20px);padding:3px 14px;border-radius:8px;margin-bottom:8px}
+  #story-text{color:#fff;font-size:clamp(15px,3.4vw,23px);font-weight:700;line-height:1.5;min-height:2.7em}
+  #story-hint{margin-top:6px;color:#9fb0ff;font-size:13px;text-align:right;animation:stblink 1.2s infinite}
+  #story-skip{position:absolute;top:14px;right:16px;z-index:5;background:#000a;color:#fff;border:2px solid #ffffff66;border-radius:20px;padding:6px 14px;font-weight:900;font-size:14px;cursor:pointer}
+  @keyframes stblink{50%{opacity:.3}}
 </style>
 </head>
 <body>
@@ -204,8 +235,30 @@
     <div class="diff-btn" data-diff="hard">HARD</div>
     <div class="diff-btn" data-diff="superhard">SUPER HARD</div>
   </div>
+  <div id="story-btn">📖 STORY MODE · 캐릭터 스토리</div>
   <div id="freemode-btn">🗺️ FREE MODE · 맵 자유선택</div>
   <div class="coin">1 COIN / 1 CREDIT &nbsp;·&nbsp; ←→ 핸들 · ↑ 가속 · ↓ 브레이크</div>
+</div>
+
+<!-- 스토리: 캐릭터 선택 -->
+<div id="charsel">
+  <div class="sel-title hud-txt">SELECT DRIVER · 주인공을 골라라</div>
+  <div id="char-grid"></div>
+  <div class="sel-hint hud-txt">각 캐릭터마다 다른 스토리가 펼쳐집니다 · 3개 코스 완주에 도전!</div>
+  <div id="char-back" class="hud-txt">◀ 타이틀로</div>
+</div>
+
+<!-- 스토리: 컷신 -->
+<div id="story">
+  <div id="story-scene"></div>
+  <div id="story-emoji"></div>
+  <div id="story-portrait"></div>
+  <div id="story-box">
+    <div id="story-name"></div>
+    <div id="story-text"></div>
+    <div id="story-hint">▶ 클릭 / 탭하여 계속</div>
+  </div>
+  <div id="story-skip">SKIP ▶▶</div>
 </div>
 
 <!-- 차 선택 -->
@@ -1611,6 +1664,7 @@ const G={
   slowAccelT:0,          // 충돌 후 천천히 가속
   tauntT:6,              // 라이벌 도발 타이머
   playerDriver:0,
+  storyMode:false, storyChar:-1,   // 스토리 모드 / 선택한 주인공(0~7)
   timeScale:1, cine:null,// 슬로우모션 연출
   replayT:0, replayShot:0,// 리플레이
 };
@@ -1977,8 +2031,9 @@ function buildCarCards(){
   });
 }
 function openCarSelect(){
-  G.mode='carselect';
+  G.mode='carselect'; G.storyMode=false; G.storyChar=-1;
   titleEl.style.display='none';
+  $('charsel').classList.remove('on');
   selEl.classList.remove('on');
   carselEl.classList.add('on');
 }
@@ -2065,11 +2120,18 @@ function updateResultBtn(){
   const b=$('res-btn');
   b.textContent = resultMode==='advance'?'NEXT COURSE ▶' : resultMode==='champion'?'BACK TO TITLE' : resultMode==='free'?'🗺️ 맵 선택':'RETRY';
 }
+function backToTitle(){ G.mode='title'; titleEl.style.display='flex'; ui.hud.classList.remove('on'); G.storyMode=false; G.storyChar=-1; }
 $('res-btn').addEventListener('click',()=>{
   ui.result.classList.remove('on');
   const rp=$('replay'); if(rp) rp.classList.remove('on');
-  if(resultMode==='advance') startCourse(G.course+1);
-  else if(resultMode==='champion'){ G.mode='title'; titleEl.style.display='flex'; ui.hud.classList.remove('on'); }
+  if(resultMode==='advance'){
+    if(G.storyMode) storyInterlude(G.course, ()=>startCourse(G.course+1));  // 다음 코스 전 스토리
+    else startCourse(G.course+1);
+  }
+  else if(resultMode==='champion'){
+    if(G.storyMode) storyInterlude(3, backToTitle);   // 엔딩 컷신
+    else backToTitle();
+  }
   else if(resultMode==='free') openSelect();   // 프리모드: 다른 맵 선택
   else startCourse(G.course);
 });
@@ -2268,6 +2330,144 @@ function playVoice(text, ttsFn, fileOverride){   // mp3 파일이 있으면 mp3,
   });
 }
 
+// ====== 스토리 모드 (캐릭터 선택 + 컷신) ======
+const CHAR_CAR=['bomba','thunder','viper','viper','bomba','bull','thunder','bull']; // 캐릭터→차
+const CHAR_TAG=['정비소 출신 노력파','마지막 질주의 노장','오만한 천재 신예','아버지의 그늘을 넘어','실력 증명 나선 스트리머','동생 위해 달리는 오프로더','트랙으로 온 폭주족 리더','복면 뒤 비밀의 레이서'];
+function CH(scene,lines){ return lines.map(L=>({who:(L[0]==='n')?'narr':L[0], scene:scene, text:L[1], expr:L[2]||0})); }
+const STORY={
+ minho:{ch:[
+  CH('suburb',[['n','낡은 정비소에서 남의 차만 고치던 강민호. 오늘, 그는 직접 운전대를 잡는다.'],[0,'언젠가 내 손으로 만든 엔진으로 정상에 선다. 그게 내 꿈이었어.'],[0,'교외 코스부터다. 가볍게 몸 좀 풀어볼까!',1]]),
+  CH('city',[['n','첫 코스를 통과한 민호. 화려한 네온 도시가 그를 맞이한다.'],[0,'이런 큰 무대는 처음이야... 긴장되는데.',2],[0,'아니, 겁먹지 말자. 내 차는 내가 제일 잘 알아!',3]]),
+  CH('beach',[['n','마지막 관문, 폭풍이 몰아치는 해변.'],[1,'꼬마, 여기까지 온 건 인정한다. 하지만 우승은 내 거야.'],[0,'베테랑이라고 봐주진 않습니다. 정비공의 자존심을 걸죠!',3]]),
+  CH('podium',[['n','거친 비바람을 뚫고, 민호의 손으로 만든 차가 결승선을 넘었다.'],[0,'해냈어... 내 엔진이, 날 챔피언으로 만들었어!',1],['n','낡은 정비소의 소년은, 이제 모두가 아는 챔피언이 되었다.']])
+ ]},
+ jisung:{ch:[
+  CH('suburb',[['n','전설로 불렸던 사나이, 박지성. 그의 마지막 시즌이 시작된다.'],[1,'무릎도 반사신경도 예전 같지 않지. 하지만 핸들 감각은 아직 죽지 않았어.'],[1,'마지막으로, 화려하게 불태워주마.',1]]),
+  CH('city',[['n','젊은 라이벌들이 그의 뒤를 바짝 쫓는다.'],[2,'한물 간 노장님, 길 좀 비켜주시죠!',3],[1,'허허, 젊은 친구. 속도만으론 못 이기는 게 있단다.']]),
+  CH('beach',[['n','폭풍의 해변. 모두가 그의 은퇴 무대를 지켜본다.'],[1,'이 한 판에 내 모든 경력을 건다. 후회는 없어.',3],[1,'자, 마지막 춤을 추자!',1]]),
+  CH('podium',[['n','노장의 머슬카가 굉음을 내며 가장 먼저 들어왔다.'],[1,'이제... 웃으며 떠날 수 있겠군.',1],['n','박수 속에, 그는 헬멧을 벗고 조용히 트랙에 작별을 고했다.']])
+ ]},
+ jun:{ch:[
+  CH('suburb',[['n','데뷔하자마자 천재로 불린 이준. 자신감은 하늘을 찌른다.'],[2,'솔직히 이 정도 코스는 눈 감고도 1등이지.',1],[2,'다들 내 뒤꽁무니나 따라오라고.',1]]),
+  CH('city',[['n','하지만 도시 코스에서 그는 처음으로 추월당한다.'],[2,'뭐야?! 내가... 밀렸다고?',2],[6,'재능만 믿다간 큰코다쳐, 신예.']]),
+  CH('beach',[['n','자존심에 금이 간 이준. 폭풍 속에서 그는 깨닫는다.'],[2,'재능만으론 부족했어. 이를 악물고 달려야 한다는 걸 이제 알았다.'],[2,'이번엔, 진짜 실력으로 이긴다!',3]]),
+  CH('podium',[['n','겸손을 배운 천재는, 비로소 진짜 챔피언이 되었다.'],[2,'이긴 것보다... 진짜로 성장한 게 더 기뻐.',1],['n','오만했던 신예는, 모두가 인정하는 레이서로 거듭났다.']])
+ ]},
+ sohee:{ch:[
+  CH('suburb',[['n','전설적인 레이서를 아버지로 둔 한소희. 사람들은 늘 그녀를 「누구의 딸」로만 불렀다.'],[3,'난 아버지의 그림자가 아냐. 「한소희」라는 이름으로 증명하겠어.'],[3,'출발선에서, 내 이야기를 시작한다.',1]]),
+  CH('city',[['n','도시의 불빛 아래, 아버지의 옛 라이벌이 그녀를 시험한다.'],[1,'네 아버지와 똑같은 눈빛이군. 하지만 트랙은 핏줄로 달리는 게 아니야.'],[3,'맞아요. 그래서 제 실력으로 보여드릴게요!',3]]),
+  CH('beach',[['n','폭풍의 해변, 아버지가 끝내 우승하지 못했던 그 코스.'],[3,'아버지가 못다 이룬 꿈... 이제 내가 완성할게요.'],[3,'보고 계시죠, 아빠?',1]]),
+  CH('podium',[['n','거센 파도를 넘어, 그녀가 가장 먼저 결승선을 통과했다.'],[3,'이건 내가 이룬 우승이야. 「한소희」의 우승!',1],['n','그날 이후, 아무도 그녀를 「누구의 딸」이라 부르지 않았다.']])
+ ]},
+ yuna:{ch:[
+  CH('suburb',[['n','수백만 팔로워를 거느린 레이싱 스트리머, 김유나. 하지만 관종이라는 꼬리표가 따라다닌다.'],[4,'여러분 안녕! 오늘은 진짜 대회 도전 생방송이에요!',1],[4,'다들 쇼라고 비웃지만... 실력으로 증명해 보일게.']]),
+  CH('city',[['n','조회수가 아닌, 진짜 승부의 압박이 그녀를 짓누른다.'],[4,'카메라 앞에선 안 떨었는데... 실전은 다르네.',2],[4,'그래도 여기서 포기하면 진짜 관종이잖아. 간다!',3]]),
+  CH('beach',[['n','폭풍 해변, 수십만 명이 그녀의 마지막 도전을 지켜본다.'],[4,'이번 한 판으로 모든 걸 증명할게. 시청자 여러분, 봐주세요!'],[4,'풀악셀, 갑니다!',1]]),
+  CH('podium',[['n','빗속을 뚫고 1위로 골인하는 순간, 채팅창이 폭발했다.'],[4,'봤죠?! 이게 진짜 김유나라고!',1],['n','그녀는 더 이상 관종이 아닌, 진짜 레이서로 불리게 되었다.']])
+ ]},
+ taeyang:{ch:[
+  CH('suburb',[['n','거친 화물 트럭을 몰던 정태양. 아픈 동생의 병원비를 위해 핸들을 잡았다.'],[5,'우승 상금이면... 동생을 살릴 수 있어.'],[5,'곱게 자란 녀석들한테 질 순 없지. 비켜라!',3]]),
+  CH('city',[['n','화려한 도시의 레이서들이 그의 투박한 SUV를 비웃는다.'],[6,'그런 고물 트럭으로 여길 왜 와?',3],[5,'고물이라도, 내 등엔 지켜야 할 사람이 있어. 그게 다르지.']]),
+  CH('beach',[['n','폭풍의 해변. 진흙과 빗물은 오히려 그의 무대다.'],[5,'이런 거친 길이라면, 내가 제일 잘 알지!',1],[5,'기다려, 형이 꼭 우승할게.']]),
+  CH('podium',[['n','진흙탕을 가르며, 투박한 SUV가 가장 먼저 결승선에 닿았다.'],[5,'동생아... 형이 해냈다!',1],['n','상금 봉투를 꼭 쥔 그의 눈엔, 뜨거운 것이 맺혀 있었다.']])
+ ]},
+ arin:{ch:[
+  CH('suburb',[['n','밤거리를 지배하던 폭주족의 리더, 서아린. 그녀는 불법을 떠나 정식 트랙에 도전한다.'],[6,'골목에서 도망치는 질주는 이제 끝. 정정당당하게 1등 한번 해보자.'],[6,'교외쯤이야, 우리 동네 뒷골목보다 쉽지.',1]]),
+  CH('city',[['n','익숙한 도시의 네온. 하지만 규칙이 있는 레이스는 낯설다.'],[6,'신호도 규칙도... 답답하네. 그래도 여기선 이게 멋인가 봐.',3],[6,'좋아, 정식으로 제대로 밟아주지.']]),
+  CH('beach',[['n','폭풍의 해변, 옛 동료들이 관중석에서 그녀를 응원한다.'],[6,'얘들아 보고 있냐! 리더가 합법으로 1등 따는 거!',1],[6,'이번 질주는, 우리 모두를 위한 거야.']]),
+  CH('podium',[['n','빗줄기를 가르며 그녀가 결승선을 넘자, 관중석이 함성으로 뒤덮였다.'],[6,'거봐, 도망치지 않아도 이렇게 빠를 수 있다고.',1],['n','거리의 전설은, 트랙의 챔피언으로 다시 태어났다.']])
+ ]},
+ bora:{ch:[
+  CH('suburb',[['n','정체불명의 복면 레이서, 최보라. 아무도 그녀의 목적을 알지 못한다.'],[7,'...드디어 찾았어. 그날의 빚을 받아낼 무대를.'],[7,'기다려. 반드시 정상에서 만나줄 테니까.',3]]),
+  CH('city',[['n','도시의 그림자 속, 그녀가 쫓던 한 사람이 모습을 드러낸다.'],[1,'복면 아래 그 눈빛... 너, 혹시?'],[7,'기억하는군요. 그럼 이야기가 빠르겠네요. 트랙에서 결판내죠.']]),
+  CH('beach',[['n','폭풍의 해변. 오랜 악연이 마지막 승부를 앞둔다.'],[7,'원망도 미움도... 오늘 이 레이스로 전부 끝낸다.'],[7,'이기면, 비로소 나도 앞으로 나아갈 수 있어.',1]]),
+  CH('podium',[['n','거센 비를 뚫고 1위로 골인한 그녀가, 천천히 복면을 벗는다.'],[7,'이제야... 웃을 수 있겠네.',1],['n','복수가 아닌 화해로 끝맺은 그녀는, 마침내 과거에서 자유로워졌다.']])
+ ]}
+};
+const SCENE_EMOJI={suburb:'🏘️ ☀️ 🌳',city:'🌃 🌙 🏙️',beach:'⛈️ 🌊 🏖️',podium:'🏆 🎉 🥇'};
+function portraitStyle(el,driver,expr,scale){
+  scale=scale||1.6; expr=expr||0;
+  const col=(driver%2)*4+expr, row=Math.floor((driver%8)/2);
+  el.style.width=(FACE_W*scale)+'px'; el.style.height=(FACE_H*scale)+'px';
+  el.style.backgroundSize=(_bgW*scale)+'px '+(_bgH*scale)+'px';
+  el.style.backgroundPosition=(-col*FACE_W*scale)+'px '+(-row*FACE_H*scale)+'px';
+}
+function storySpeak(who,text){
+  if(muted) return;
+  try{ speechSynthesis.cancel(); }catch(e){}
+  if(typeof who==='number'){ speakAs(who,text); return; }
+  if(!('speechSynthesis' in window)) return;
+  try{ const u=new SpeechSynthesisUtterance(text); u.lang='ko-KR'; if(CASTER_VOICE)u.voice=CASTER_VOICE; u.pitch=0.92; u.rate=1.0; u.volume=1; speechSynthesis.speak(u); }catch(e){}
+}
+let _stBeats=null,_stIdx=0,_stDone=null;
+function playCutscene(beats,onDone){
+  if(!beats||!beats.length){ if(onDone)onDone(); return; }
+  _stBeats=beats; _stIdx=-1; _stDone=onDone||null;
+  G.mode='story';
+  titleEl.style.display='none'; $('charsel').classList.remove('on'); selEl.classList.remove('on'); carselEl.classList.remove('on'); ui.result.classList.remove('on'); ui.hud.classList.remove('on');
+  $('story').classList.add('on');
+  stNext();
+}
+function stRender(b){
+  $('story-scene').className=b.scene||'suburb';
+  $('story-emoji').textContent=SCENE_EMOJI[b.scene]||'';
+  const port=$('story-portrait'), nm=$('story-name'), tx=$('story-text');
+  if(typeof b.who==='number'){ port.classList.remove('narr'); portraitStyle(port,b.who,b.expr||0,1.7); nm.textContent=DRIVER_NAMES[b.who]||''; }
+  else { port.classList.add('narr'); nm.textContent='내레이션'; }
+  tx.textContent=b.text||'';
+  storySpeak(b.who,b.text||'');
+}
+function stNext(){
+  _stIdx++;
+  if(!_stBeats || _stIdx>=_stBeats.length){ stEnd(); return; }
+  stRender(_stBeats[_stIdx]);
+}
+function stEnd(){
+  $('story').classList.remove('on');
+  try{ speechSynthesis.cancel(); }catch(e){}
+  const cb=_stDone; _stBeats=null; _stDone=null;
+  if(cb) cb();
+}
+function storyInterlude(chapterIdx,done){
+  const key=DRIVER_KEY[G.storyChar]||'minho'; const st=STORY[key];
+  const beats=st&&st.ch&&st.ch[chapterIdx];
+  if(beats&&beats.length) playCutscene(beats,done); else if(done) done();
+}
+function openCharSelect(){
+  G.mode='charselect';
+  titleEl.style.display='none'; carselEl.classList.remove('on'); selEl.classList.remove('on');
+  buildCharCards();
+  $('charsel').classList.add('on');
+}
+let _charBuilt=false;
+function buildCharCards(){
+  if(_charBuilt) return; _charBuilt=true;
+  const grid=$('char-grid'); if(!grid) return;
+  for(let i=0;i<8;i++){
+    const card=document.createElement('div'); card.className='charcard';
+    const port=document.createElement('div'); port.className='cport'; portraitStyle(port,i,0,0.82);
+    const nm=document.createElement('div'); nm.className='cname'; nm.textContent=DRIVER_NAMES[i];
+    const sx=document.createElement('div'); sx.className='csex '+(DRIVER_GENDER[i]==='M'?'m':'f'); sx.textContent=DRIVER_GENDER[i]==='M'?'♂ 남':'♀ 여';
+    const tg=document.createElement('div'); tg.className='ctag'; tg.textContent=CHAR_TAG[i];
+    card.appendChild(port); card.appendChild(nm); card.appendChild(sx); card.appendChild(tg);
+    card.addEventListener('click',()=>pickStoryChar(i));
+    grid.appendChild(card);
+  }
+}
+function pickStoryChar(i){
+  audioInit(); if(AC&&AC.state==='suspended')AC.resume(); warmTTS();
+  G.storyMode=true; G.storyChar=i; G.playerDriver=i;
+  const spec=CARS.find(c=>c.key===CHAR_CAR[i])||CARS[0]; G.car=spec; setPlayerCar(spec);
+  beep(880,.1);
+  $('charsel').classList.remove('on');
+  const key=DRIVER_KEY[i]||'minho'; const st=STORY[key];
+  playCutscene(st&&st.ch&&st.ch[0], ()=>startCourse(1));
+}
+$('story-btn').addEventListener('click',e=>{ e.stopPropagation(); openCharSelect(); });
+$('char-back').addEventListener('click',e=>{ e.stopPropagation(); $('charsel').classList.remove('on'); G.mode='title'; titleEl.style.display='flex'; });
+$('story').addEventListener('click',e=>{ if(e.target&&e.target.id==='story-skip') return; stNext(); });
+$('story-skip').addEventListener('click',e=>{ e.stopPropagation(); stEnd(); });
+
 // ====== 아이템 슬롯 / 사용 ======
 function updateItemHud(){ for(let i=0;i<2;i++){ const ic=$('iicon'+i); if(ic) ic.textContent=G.items[i]?itemIcon(G.items[i]):''; } }
 function giveItem(){
@@ -2301,7 +2501,7 @@ function useItem(slot){
 function resetRaceObjects(){
   G.items=[null,null]; G.star=0; G.boost=0; G.airT=0; G.airDur=0; G.airY=0;
   G.rollT=0; G.spinT=0; G.slowAccelT=0; G.hitGraceT=0; G.launchT=0; G._wasInvinc=false;
-  G.playerDriver=CAR_DRIVER[G.car.key]||0;
+  G.playerDriver=(G.storyMode&&G.storyChar>=0)?G.storyChar:(CAR_DRIVER[G.car.key]||0);
   for(const b of bananas) scene.remove(b.mesh); bananas.length=0;
   for(const p of projectiles) scene.remove(p.mesh); projectiles.length=0;
   for(const ib of itemBoxes){ ib.active=true; ib.respawn=0; ib.mesh.visible=true; }
