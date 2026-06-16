@@ -112,6 +112,18 @@
   #result .sub{font-size:clamp(15px,3.4vw,26px);color:#fff;font-weight:900;font-style:italic;text-shadow:var(--hud-shadow);text-align:center;line-height:1.6}
   #result .btn{pointer-events:auto;cursor:pointer;background:linear-gradient(180deg,#ff5147,#b41710);color:#fff;border:3px solid #fff;padding:12px 34px;font-size:clamp(15px,3vw,22px);font-weight:900;font-style:italic;font-family:inherit;box-shadow:0 6px 0 #5e0f0a;transform:skewX(-8deg)}
   #result .btn:active{transform:skewX(-8deg) translateY(4px);box-shadow:0 2px 0 #5e0f0a}
+  #result .btn.home,.pbtn.home{background:linear-gradient(180deg,#2aa3ff,#1763c4);box-shadow:0 6px 0 #0c3a78}
+  #result .btn.home:active{box-shadow:0 2px 0 #0c3a78}
+  /* 일시정지 */
+  #pause-btn{position:fixed;top:12px;left:12px;z-index:22;display:none;width:46px;height:46px;line-height:44px;text-align:center;font-size:24px;color:#fff;background:#0b1030cc;border:2px solid #ffffff66;border-radius:12px;cursor:pointer;pointer-events:auto;user-select:none}
+  #pause-btn.on{display:block}
+  #pause{position:fixed;inset:0;z-index:45;display:none;align-items:center;justify-content:center;background:#04061ccc}
+  #pause.on{display:flex}
+  .pause-card{display:flex;flex-direction:column;gap:14px;align-items:center;background:#0b1030;border:3px solid #ffd722;border-radius:18px;padding:26px 34px;box-shadow:0 10px 40px #000b}
+  .pause-title{color:#ffd722;font-weight:900;font-style:italic;font-size:clamp(26px,6vw,44px);letter-spacing:2px;text-shadow:var(--hud-shadow)}
+  .pbtn{cursor:pointer;pointer-events:auto;min-width:200px;text-align:center;color:#fff;font-weight:900;font-style:italic;font-size:clamp(15px,3vw,20px);padding:12px 28px;border:3px solid #fff;border-radius:12px;background:linear-gradient(180deg,#ff5147,#b41710);box-shadow:0 5px 0 #5e0f0a;transform:skewX(-6deg)}
+  .pbtn:active{transform:skewX(-6deg) translateY(3px);box-shadow:0 2px 0 #5e0f0a}
+  #p-resume{background:linear-gradient(180deg,#34d36b,#149247);box-shadow:0 5px 0 #0a5e2c}
 
   /* ===== 모바일 컨트롤 ===== */
   #pads{position:fixed;inset:0;z-index:15;display:none;pointer-events:none}
@@ -303,6 +315,18 @@
   <div class="big" id="res-big"></div>
   <div class="sub" id="res-sub"></div>
   <button class="btn" id="res-btn">RESTART</button>
+  <button class="btn home" id="res-home">🏠 홈으로 가기</button>
+</div>
+
+<!-- 일시정지 버튼 & 메뉴 -->
+<div id="pause-btn">⏸</div>
+<div id="pause">
+  <div class="pause-card">
+    <div class="pause-title">PAUSED</div>
+    <div class="pbtn" id="p-resume">▶ 계속하기</div>
+    <div class="pbtn" id="p-restart">↻ 다시 시작</div>
+    <div class="pbtn home" id="p-home">🏠 홈으로 가기</div>
+  </div>
 </div>
 
 <!-- 모바일 패드 -->
@@ -1665,6 +1689,7 @@ const G={
   tauntT:6,              // 라이벌 도발 타이머
   playerDriver:0,
   storyMode:false, storyChar:-1,   // 스토리 모드 / 선택한 주인공(0~7)
+  paused:false, _midIdx:0,         // 일시정지 / 인레이스 스토리 대사 인덱스
   timeScale:1, cine:null,// 슬로우모션 연출
   replayT:0, replayShot:0,// 리플레이
 };
@@ -1681,6 +1706,8 @@ const input={L:false,R:false,G:false,B:false};
 // ---------- 입력 ----------
 const KEY={ArrowLeft:'L',KeyA:'L',ArrowRight:'R',KeyD:'R',ArrowUp:'G',KeyW:'G',ArrowDown:'B',KeyS:'B'};
 addEventListener('keydown',e=>{
+  if((e.code==='Escape'||e.code==='KeyP') && (G.paused || G.mode==='race' || G.mode==='countdown')){ e.preventDefault(); togglePause(); return; }
+  if(G.paused) return;
   if(KEY[e.code]) input[KEY[e.code]]=true;
   if(G.mode==='race'){ if(e.code==='KeyZ') useItem(0); else if(e.code==='KeyX') useItem(1); }
   if(G.mode==='title' && (e.code==='Enter'||e.code==='Space'||KEY[e.code])){ G.freeMode=false; openCarSelect(); }
@@ -2070,6 +2097,7 @@ function startCourse(courseNum){
   selEl.classList.remove('on'); titleEl.style.display='none'; carselEl.classList.remove('on');
   ui.result.classList.remove('on');
   ui.hud.classList.add('on'); $('pads').classList.add('on');
+  G.paused=false; G._midIdx=0; $('pause').classList.remove('on'); showPauseBtn(true);
   $('mirror-frame').classList.add('on'); $('minimap').classList.add('on'); $('speedfx').classList.add('on');
   startMusic(THEME.scene);
   raceGirl.visible=true;
@@ -2120,7 +2148,7 @@ function updateResultBtn(){
   const b=$('res-btn');
   b.textContent = resultMode==='advance'?'NEXT COURSE ▶' : resultMode==='champion'?'BACK TO TITLE' : resultMode==='free'?'🗺️ 맵 선택':'RETRY';
 }
-function backToTitle(){ G.mode='title'; titleEl.style.display='flex'; ui.hud.classList.remove('on'); G.storyMode=false; G.storyChar=-1; }
+function backToTitle(){ G.mode='title'; titleEl.style.display='flex'; ui.hud.classList.remove('on'); showPauseBtn(false); G.storyMode=false; G.storyChar=-1; }
 $('res-btn').addEventListener('click',()=>{
   ui.result.classList.remove('on');
   const rp=$('replay'); if(rp) rp.classList.remove('on');
@@ -2138,7 +2166,7 @@ $('res-btn').addEventListener('click',()=>{
 
 function finishCourse(){
   const ahead=G.finishedCount, rank=ahead+1;   // 먼저 골인한 라이벌 수 = 내 앞 순위
-  G.mode='over'; ui.hud.classList.remove('on'); fadeMusic(); skidSound(false);
+  G.mode='over'; ui.hud.classList.remove('on'); fadeMusic(); skidSound(false); showPauseBtn(false);
   $('mirror-frame').classList.remove('on'); $('minimap').classList.remove('on');
   $('speedfx').classList.remove('on'); $('vignette').style.opacity=0; $('bluredge').style.opacity=0;
   if(eng)eng.master.gain.setTargetAtTime(0,AC?AC.currentTime:0,0.1);
@@ -2174,7 +2202,7 @@ function finishCourse(){
   ui.result.classList.add('on'); updateResultBtn(); startReplay();
 }
 function failTimeout(){
-  G.mode='over'; ui.hud.classList.remove('on'); fadeMusic(); skidSound(false);
+  G.mode='over'; ui.hud.classList.remove('on'); fadeMusic(); skidSound(false); showPauseBtn(false);
   $('mirror-frame').classList.remove('on'); $('minimap').classList.remove('on');
   $('speedfx').classList.remove('on'); $('vignette').style.opacity=0; $('bluredge').style.opacity=0;
   if(eng)eng.master.gain.setTargetAtTime(0,AC?AC.currentTime:0,0.1);
@@ -2404,7 +2432,7 @@ function playCutscene(beats,onDone){
   if(!beats||!beats.length){ if(onDone)onDone(); return; }
   _stBeats=beats; _stIdx=-1; _stDone=onDone||null;
   G.mode='story';
-  titleEl.style.display='none'; $('charsel').classList.remove('on'); selEl.classList.remove('on'); carselEl.classList.remove('on'); ui.result.classList.remove('on'); ui.hud.classList.remove('on');
+  titleEl.style.display='none'; $('charsel').classList.remove('on'); selEl.classList.remove('on'); carselEl.classList.remove('on'); ui.result.classList.remove('on'); ui.hud.classList.remove('on'); showPauseBtn(false);
   $('story').classList.add('on');
   stNext();
 }
@@ -2467,6 +2495,54 @@ $('story-btn').addEventListener('click',e=>{ e.stopPropagation(); openCharSelect
 $('char-back').addEventListener('click',e=>{ e.stopPropagation(); $('charsel').classList.remove('on'); G.mode='title'; titleEl.style.display='flex'; });
 $('story').addEventListener('click',e=>{ if(e.target&&e.target.id==='story-skip') return; stNext(); });
 $('story-skip').addEventListener('click',e=>{ e.stopPropagation(); stEnd(); });
+
+// 레이싱 중 짧은 스토리 대사 (체크포인트 타임추가마다)
+const STORY_MID={
+ minho:['좋아, 시간 벌었다!','이 감각, 정비소에서 갈고닦은 거야!','엔진 상태 최고인데?','조금만 더 밀어붙이자!'],
+ jisung:['아직 녹슬지 않았어!','경험은 못 속이지.','이 정도 코스는 눈 감고도.','마지막까지 우아하게.'],
+ jun:['역시 난 천재야!','이 라인, 완벽해.','집중, 집중!','방심은 없다.'],
+ sohee:['보고 계세요, 아빠?','내 이름을 증명한다.','아직 멀었어, 더!','이게 나, 한소희야.'],
+ yuna:['시청자 여러분 보셨죠?','구독 좋아요 부탁해요!','이 구간 완전 꿀잼!','실력으로 보여줄게!'],
+ taeyang:['동생아, 조금만 기다려!','이 악물고 간다!','거친 길은 내 전문이지.','상금은 내 거다!'],
+ arin:['합법 질주도 짜릿한데?','뒷골목보다 시원해!','얘들아 봤지?','규칙 안에서도 1등이야!'],
+ bora:['...한 발 더 다가간다.','오늘, 끝을 본다.','흔들리지 마, 보라.','이 빚, 반드시 갚는다.']
+};
+function storyMidBeat(){
+  if(!G.storyMode || G.storyChar<0 || G.cine) return;   // 다른 연출 중이면 생략
+  const lines=STORY_MID[DRIVER_KEY[G.storyChar]]; if(!lines||!lines.length) return;
+  const text=lines[(G._midIdx||0)%lines.length]; G._midIdx=(G._midIdx||0)+1;
+  startCine('story',1.3);          // 잠깐 슬로우 → 빠르게 복귀(주행뷰 유지)
+  showFace('L', G.storyChar, 1, text);   // 주인공 말풍선 + TTS(드라이버 음성)
+}
+
+// ====== 일시정지 / 홈 ======
+function showPauseBtn(b){ const e=$('pause-btn'); if(e) e.classList.toggle('on', !!b); }
+function togglePause(){
+  if(G.paused){ resumeGame(); return; }
+  if(G.mode!=='race' && G.mode!=='countdown') return;
+  G.paused=true; $('pause').classList.add('on');
+  try{ if(AC) AC.suspend(); }catch(e){}
+  try{ speechSynthesis.pause(); }catch(e){}
+}
+function resumeGame(){
+  if(!G.paused) return;
+  G.paused=false; $('pause').classList.remove('on');
+  try{ if(AC&&AC.state==='suspended') AC.resume(); }catch(e){}
+  try{ speechSynthesis.resume(); }catch(e){}
+}
+function goHome(){
+  resumeGame();
+  $('pause').classList.remove('on'); ui.result.classList.remove('on');
+  const rp=$('replay'); if(rp) rp.classList.remove('on');
+  try{ speechSynthesis.cancel(); }catch(e){}
+  fadeMusic(); stopTTS(); showPauseBtn(false);
+  backToTitle();
+}
+$('pause-btn').addEventListener('click',e=>{ e.stopPropagation(); togglePause(); });
+$('p-resume').addEventListener('click',e=>{ e.stopPropagation(); resumeGame(); });
+$('p-restart').addEventListener('click',e=>{ e.stopPropagation(); resumeGame(); startCourse(G.course); });
+$('p-home').addEventListener('click',e=>{ e.stopPropagation(); goHome(); });
+$('res-home').addEventListener('click',e=>{ e.stopPropagation(); goHome(); });
 
 // ====== 아이템 슬롯 / 사용 ======
 function updateItemHud(){ for(let i=0;i<2;i++){ const ic=$('iicon'+i); if(ic) ic.textContent=G.items[i]?itemIcon(G.items[i]):''; } }
@@ -2800,6 +2876,7 @@ function updateCameos(dt, now){
 let last=performance.now();
 function loop(now){
   requestAnimationFrame(loop);
+  if(G.paused){ last=now; return; }   // 일시정지: 갱신 멈춤
   const realDt=Math.min((now-last)/1000,.05); last=now;
   updateCine(realDt);
   const dt=realDt*(G.timeScale||1);   // 슬로우모션 반영
@@ -3029,7 +3106,7 @@ function loop(now){
       const _co=COURSES[G.course-1];
       if(G.nextCk<checkpoints.length && G.s>checkpoints[G.nextCk].s){
         const cp=checkpoints[G.nextCk]; G.nextCk++; G.time+=_co.ck;
-        if(cp.arch){ msg('+'+_co.ck,'#7dff7d'); beep(988,.1); }   // 카메라 연출 없이 +시간만
+        if(cp.arch){ msg('+'+_co.ck,'#7dff7d'); beep(988,.1); if(G.storyMode) storyMidBeat(); }   // 타임추가 + 스토리 대사
         else beep(900,.05,'square',.08);
       }
       // 랩 통과 / 코스 완주
@@ -3079,7 +3156,7 @@ function loop(now){
     const look=sample(G.s+14);
     const driveLook=new T.Vector3(look.x+Math.cos(look.h)*G.lat*.4, look.y+1.5, look.z+Math.sin(look.h)*G.lat*.4);
     const driveFov=Math.min(102, 70+G.spd*.28);
-    if(G.cine){
+    if(G.cine && G.cine.type!=='story'){
       // 슬로우모션 시네마틱 줌 (충돌/랩)
       const c=G.cine, ang=now*0.0008;
       const focus=(c.type==='lap' && raceGirl.visible)? raceGirl.position : player.position;
