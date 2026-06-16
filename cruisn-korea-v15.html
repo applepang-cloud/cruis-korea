@@ -74,7 +74,7 @@
   .facebox{position:fixed;top:34%;display:none;align-items:flex-end;gap:8px;z-index:13}
   .facebox.on{display:flex}
   .facebox.right{right:14px;top:13%;flex-direction:row}   /* 우측 미니맵 위쪽 */
-  .facebox:not(.right){left:14px;flex-direction:row-reverse}
+  .facebox:not(.right){left:14px;top:96px;flex-direction:row-reverse;align-items:flex-start}
   .face{position:relative;width:clamp(72px,15vw,104px);height:clamp(96px,20vw,138px);background-image:url(drivers.png);background-repeat:no-repeat;border:3px solid #ffffffcc;border-radius:10px;box-shadow:0 4px 10px #0009;background-color:#10142a;flex-shrink:0}
   .dname{position:absolute;bottom:0;left:0;right:0;background:#000c;color:#ffd722;font-size:clamp(10px,2.2vw,14px);font-weight:900;text-align:center;border-radius:0 0 7px 7px;padding:1px 0;letter-spacing:-0.5px;white-space:nowrap}
   .dname:empty{display:none}
@@ -115,7 +115,7 @@
   #result .btn.home,.pbtn.home{background:linear-gradient(180deg,#2aa3ff,#1763c4);box-shadow:0 6px 0 #0c3a78}
   #result .btn.home:active{box-shadow:0 2px 0 #0c3a78}
   /* 일시정지 */
-  #pause-btn{position:fixed;top:12px;left:12px;z-index:22;display:none;width:46px;height:46px;line-height:44px;text-align:center;font-size:24px;color:#fff;background:#0b1030cc;border:2px solid #ffffff66;border-radius:12px;cursor:pointer;pointer-events:auto;user-select:none}
+  #pause-btn{position:fixed;top:54px;left:10px;z-index:31;display:none;width:38px;height:38px;line-height:36px;text-align:center;font-size:20px;color:#fff;background:#0b1030cc;border:2px solid #ffffff66;border-radius:10px;cursor:pointer;pointer-events:auto;user-select:none}
   #pause-btn.on{display:block}
   #pause{position:fixed;inset:0;z-index:45;display:none;align-items:center;justify-content:center;background:#04061ccc}
   #pause.on{display:flex}
