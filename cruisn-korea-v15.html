@@ -308,6 +308,27 @@
       <div class="sel-name">STORMY BEACH</div>
       <div class="sel-desc">폭풍우 해변 · 천둥</div>
     </div>
+    <div class="sel-card" data-map="themepark">
+      <div class="sel-art" style="background:linear-gradient(#160a30 0%,#3a1a5e 55%,#7a2a8e 100%)">
+        <span class="sel-emoji">🎡🎢</span>
+      </div>
+      <div class="sel-name">THEME PARK</div>
+      <div class="sel-desc">야간 놀이공원 · 화려</div>
+    </div>
+    <div class="sel-card" data-map="ghost">
+      <div class="sel-art" style="background:linear-gradient(#081210 0%,#10241c 55%,#1a3a2a 100%)">
+        <span class="sel-emoji">👻🦇</span>
+      </div>
+      <div class="sel-name">GHOST CITY</div>
+      <div class="sel-desc">유령 도시 · 밤</div>
+    </div>
+    <div class="sel-card" data-map="penguin">
+      <div class="sel-art" style="background:linear-gradient(#aad4f0 0%,#dfeef8 55%,#eaf2fa 100%)">
+        <span class="sel-emoji">🐧❄️</span>
+      </div>
+      <div class="sel-name">PENGUIN ISLE</div>
+      <div class="sel-desc">남극 펭귄 섬 · 눈</div>
+    </div>
   </div>
   <div class="sel-hint hud-txt">코스를 터치하면 출발!</div>
   <div class="sel-back" id="course-back">◀ 차 다시 고르기</div>
@@ -380,7 +401,16 @@ const THEMES={
     mountain:false, clouds:false, palms:true, houses:false, scene:'city', rain:false },
   beach:{ name:'STORMY BEACH', sky:0x3a4452, fog:0x4a5562, fogN:120, fogF:620,
     sun:0x99a3b5, sunI:.4, amb:0x556070, ambI:.6, ground:0xc9b487,
-    mountain:false, clouds:true, palms:true, houses:false, scene:'beach', rain:true }
+    mountain:false, clouds:true, palms:true, houses:false, scene:'beach', rain:true },
+  themepark:{ name:'THEME PARK · NIGHT', sky:0x160a30, fog:0x2c1452, fogN:170, fogF:860,
+    sun:0xffd0ff, sunI:.55, amb:0x8a6ad0, ambI:1.05, ground:0x281a3c,
+    mountain:false, clouds:false, palms:false, houses:false, scene:'themepark', rain:false, night:true },
+  ghost:{ name:'GHOST CITY · NIGHT', sky:0x081210, fog:0x10241c, fogN:110, fogF:640,
+    sun:0x9fffcf, sunI:.42, amb:0x4f7666, ambI:.9, ground:0x121a16,
+    mountain:false, clouds:true, palms:false, houses:false, scene:'ghost', rain:false, night:true },
+  penguin:{ name:'PENGUIN ISLE · SNOW', sky:0xaad4f0, fog:0xdfeef8, fogN:170, fogF:820,
+    sun:0xffffff, sunI:.95, amb:0xcfe2f0, ambI:.95, ground:0xeaf2fa,
+    mountain:true, clouds:true, palms:false, houses:false, scene:'penguin', rain:false, snow:true }
 };
 let THEME=THEMES.suburb;
 
@@ -1030,11 +1060,15 @@ const lightning=new T.PointLight(0xddeaff,0,600);
 lightning.position.set(0,200,0); scene.add(lightning);
 let boltT=2+Math.random()*4;        // 다음 번개까지
 function updateWeather(dt, camPos){
-  if(!THEME.rain){ rain.visible=false; lightning.intensity=0; return; }
+  const snowing=!!THEME.snow;
+  if(!THEME.rain && !snowing){ rain.visible=false; lightning.intensity=0; return; }
   rain.visible=true;
+  rainMat.color.setHex(snowing?0xffffff:0xbfd0e0); rainMat.size=snowing?1.6:0.5; rainMat.opacity=snowing?0.92:0.6;
   const pos=rainGeo.attributes.position.array;
+  const fall=snowing?0.32:1;
   for(let i=0;i<RAIN_N;i++){
-    pos[i*3+1]-=rainVel[i]*dt;
+    pos[i*3+1]-=rainVel[i]*dt*fall;
+    if(snowing){ pos[i*3]+=Math.sin(pos[i*3+1]*0.25+i)*dt*3.5; pos[i*3+2]+=Math.cos(pos[i*3+1]*0.2+i)*dt*2; }  // 눈 흩날림
     if(pos[i*3+1]<0){
       pos[i*3]  =camPos.x+(Math.random()-.5)*120;
       pos[i*3+1]=80+Math.random()*20;
@@ -1043,7 +1077,8 @@ function updateWeather(dt, camPos){
   }
   rain.position.set(0,0,0);
   rainGeo.attributes.position.needsUpdate=true;
-  // 번개
+  // 번개 (폭풍우 비에서만)
+  if(!THEME.rain){ lightning.intensity=0; return; }
   boltT-=dt;
   if(lightning.intensity>0) lightning.intensity*=Math.pow(.02,dt*8);
   if(boltT<=0){
@@ -1656,6 +1691,9 @@ const COURSES=[
   {map:'suburb', name:'COURSE 1 · SUNNY SUBURB', diff:1.00, time:52, ck:5, lap:5, laps:2},
   {map:'city',   name:'COURSE 2 · NEON CITY',    diff:1.08, time:48, ck:5, lap:5, laps:2},
   {map:'beach',  name:'COURSE 3 · STORMY BEACH', diff:1.16, time:44, ck:5, lap:5, laps:3},
+  {map:'themepark', name:'COURSE 4 · THEME PARK', diff:1.20, time:52, ck:5, lap:5, laps:2},
+  {map:'ghost',     name:'COURSE 5 · GHOST CITY', diff:1.24, time:50, ck:5, lap:5, laps:2},
+  {map:'penguin',   name:'COURSE 6 · PENGUIN ISLE', diff:1.28, time:52, ck:5, lap:5, laps:2},
 ];
 let TOTAL_LAPS=3;   // 코스 시작 시 COURSES[c].laps로 설정
 // 난이도 (이지=현재, 하드=적 빠름, 수퍼하드=더 빠름+아이템 공격↑)
@@ -1838,7 +1876,8 @@ const MUSIC_VOL=0.5;
 // 맵별 트랙: bpm, 베이스 진행(주파수), 리드 아르페지오(반음 오프셋), 드럼 스타일
 const N={C2:65.41,D2:73.42,E2:82.41,F2:87.31,G2:98,A2:110,B2:123.47,
   C3:130.81,D3:146.83,E3:164.81,F3:174.61,G3:196,A3:220,
-  C4:261.63,D4:293.66,E4:329.63,F4:349.23,G4:392,A4:440,B4:493.88,C5:523.25};
+  C4:261.63,D4:293.66,E4:329.63,F4:349.23,G4:392,A4:440,B4:493.88,
+  C5:523.25,D5:587.33,E5:659.25,F5:698.46,G5:783.99};
 const TRACKS={
   suburb:{ bpm:140, drive:'major',
     bass:[N.C2,N.C2,N.G2,N.G2,N.A2,N.A2,N.F2,N.F2],
@@ -1855,6 +1894,18 @@ const TRACKS={
   lobby:{ bpm:96, drive:'major',     // 홈/메뉴 로비 음악 (잔잔)
     bass:[N.C2,N.C2,N.G2,N.G2,N.A2,N.A2,N.F2,N.F2],
     lead:[N.E4,N.G4,N.C5,N.G4, N.D4,N.G4,N.B4,N.G4, N.A3,N.C4,N.E4,N.C4, N.F4,N.A4,N.C5,N.A4],
+    leadType:'triangle', pad:true },
+  themepark:{ bpm:138, drive:'major',   // 놀이공원 (밝고 신나는 캐러셀풍)
+    bass:[N.C2,N.G2,N.C2,N.G2,N.A2,N.E2,N.F2,N.G2],
+    lead:[N.C5,N.E4,N.G4,N.C5, N.E4,N.G4,N.C5,N.E4, N.A4,N.C5,N.E4,N.A4, N.G4,N.B4,N.D4,N.G4],
+    leadType:'square', pad:true },
+  ghost:{ bpm:104, drive:'minor',       // 유령 도시 (으스스한 단조)
+    bass:[N.A2,N.A2,N.F2,N.F2,N.D2,N.D2,N.E2,N.E2],
+    lead:[N.A4,N.C5,N.B4,N.A4, N.F4,N.A4,N.G3,N.F4, N.D4,N.F4,N.E4,N.D4, N.E4,N.G3,N.B2,N.E4],
+    leadType:'sawtooth', pad:true },
+  penguin:{ bpm:118, drive:'major',     // 펭귄 섬 (맑고 청량한)
+    bass:[N.D2,N.A2,N.D2,N.A2,N.G2,N.D2,N.A2,N.A2],
+    lead:[N.D5,N.A4,N.F4,N.A4, N.D5,N.B4,N.G4,N.B4, N.A4,N.F4,N.D4,N.F4, N.G4,N.B4,N.D5,N.A4],
     leadType:'triangle', pad:true }
 };
 let curTrack=TRACKS.suburb;
@@ -2091,12 +2142,12 @@ function openSelect(){
 function updateLapHud(){
   const lp=$('lap'); if(lp) lp.textContent=G.lap;
   const lt=$('laptot'); if(lt) lt.textContent=TOTAL_LAPS;
-  const cs=$('hud-course'); if(cs) cs.textContent='COURSE '+G.course+'/3';
+  const cs=$('hud-course'); if(cs) cs.textContent='COURSE '+G.course+'/'+COURSES.length;
 }
 function startCourse(courseNum){
   audioInit(); if(AC&&AC.state==='suspended')AC.resume();
   warmTTS();
-  G.course=Math.max(1,Math.min(3,courseNum));
+  G.course=Math.max(1,Math.min(COURSES.length,courseNum));
   const co=COURSES[G.course-1];
   G.diff=co.diff; TOTAL_LAPS=co.laps;
   THEME=THEMES[co.map]; buildScenery();
@@ -2188,10 +2239,10 @@ function finishCourse(){
     ui.result.classList.add('on'); updateResultBtn(); startReplay(); return;
   }
   if(rank<=3){
-    if(G.course>=3){
-      unlockedCourse=3;
+    if(G.course>=COURSES.length){
+      unlockedCourse=COURSES.length;
       ui.resBig.textContent='🏆 CHAMPION!';
-      ui.resSub.innerHTML='3개 코스 완주 · 최종 '+ORD[ahead].toUpperCase()+' PLACE<br>당신이 챔피언입니다!';
+      ui.resSub.innerHTML=COURSES.length+'개 코스 완주 · 최종 '+ORD[ahead].toUpperCase()+' PLACE<br>당신이 챔피언입니다!';
       resultMode='champion';
       say('최종 코스까지 '+ORD_KR[ahead]+'로 통과! 챔피언 등극입니다!',true);
     }else{
