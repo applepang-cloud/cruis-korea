@@ -811,6 +811,7 @@ const aircraft=[];
 const funRides=[];    // 회전/스윙 놀이기구 (대관람차/회전목마/바이킹) {mesh,spd,axis|swing}
 const coasters=[];    // 롤러코스터 {g,t,spd}
 const flumes=[];      // 후룸라이드 {g,t,spd}
+const ghostFx=[];     // 유령/박쥐떼 {mesh,kind,s,lat,ph,dir,spd}
 function makeShadow(r){ const m=new T.Mesh(new T.CircleGeometry(r,18),
   new T.MeshBasicMaterial({color:0x000000,transparent:true,opacity:0.3,depthWrite:false}));
   m.rotation.x=-Math.PI/2; scene.add(m); return m; }
@@ -1016,9 +1017,87 @@ function makeFlume(){
   g.add(log); g.userData.log=log; return g;
 }
 
+// ===== 유령도시 빌더 =====
+function makeGhost(sc){
+  sc=sc||1; const g=new T.Group();
+  const mat=new T.MeshBasicMaterial({color:0xddfff2,transparent:true,opacity:0.62});
+  const body=new T.Mesh(new T.SphereGeometry(0.9*sc,12,10,0,Math.PI*2,0,Math.PI*0.62),mat);
+  g.add(body);
+  g.add(new T.Mesh(new T.CylinderGeometry(0.9*sc,0.95*sc,0.7*sc,12),mat).translateY(-0.55*sc));
+  for(const wb of [-0.45,0,0.45]) g.add(new T.Mesh(new T.SphereGeometry(0.22*sc,8,6),mat).translateX(wb*sc).translateY(-0.9*sc)); // 물결 밑단
+  for(const ex of [-0.3,0.3]){ g.add(new T.Mesh(new T.SphereGeometry(0.13*sc,8,6),new T.MeshBasicMaterial({color:0x101018})).translateX(ex*sc).translateY(0.15*sc).translateZ(0.78*sc)); }
+  g.add(new T.Mesh(new T.SphereGeometry(0.16*sc,8,6),new T.MeshBasicMaterial({color:0x101018})).translateY(-0.25*sc).translateZ(0.8*sc)); // 입
+  return g;
+}
+function makeGhostHotel(){
+  const g=new T.Group();
+  const wall=new T.MeshLambertMaterial({color:0x2a2438});
+  const h=22+Math.random()*14;
+  g.add(new T.Mesh(new T.BoxGeometry(12,h,10),wall).translateY(h/2));
+  // 박공 지붕
+  g.add(new T.Mesh(new T.ConeGeometry(9,5,4),new T.MeshLambertMaterial({color:0x1a1626})).translateY(h+2.4).rotateY(Math.PI/4));
+  // 깜빡이는 창문 불빛
+  for(let r=0;r<Math.floor(h/4);r++) for(let c=0;c<3;c++){ if(Math.random()<0.6){
+    const win=new T.Mesh(new T.PlaneGeometry(1.4,2),new T.MeshBasicMaterial({color:Math.random()<0.5?0xffd24a:0x7affc0}));
+    win.position.set(-3.5+c*3.5, 3+r*4, 5.05); g.add(win); } }
+  // 간판
+  g.add(new T.Mesh(new T.BoxGeometry(8,1.6,0.3),new T.MeshBasicMaterial({color:0x9b2030})).translateY(h-1).translateZ(5.1));
+  return g;
+}
+function makeDarkCastle(){
+  const g=new T.Group();
+  const wall=new T.MeshLambertMaterial({color:0x241e30});
+  g.add(new T.Mesh(new T.BoxGeometry(16,18,12),wall).translateY(9));
+  function tw(r,h,x,z){ const t=new T.Group();
+    t.add(new T.Mesh(new T.CylinderGeometry(r,r*1.05,h,10),wall).translateY(h/2));
+    t.add(new T.Mesh(new T.ConeGeometry(r*1.3,r*2.6,10),new T.MeshLambertMaterial({color:0x14101e})).translateY(h+r*1.3));
+    t.position.set(x,0,z); return t; }
+  g.add(tw(2.6,30,0,-1)); g.add(tw(2,22,-8,3)); g.add(tw(2,22,8,3)); g.add(tw(1.6,15,-10,-5)); g.add(tw(1.6,15,10,-5));
+  // 붉은 창문
+  for(let i=0;i<8;i++){ const win=new T.Mesh(new T.PlaneGeometry(1,1.6),new T.MeshBasicMaterial({color:0xcc2a2a}));
+    win.position.set(-6+(i%4)*4, 5+Math.floor(i/4)*5, 6.05); g.add(win); }
+  return g;
+}
+function makeTombstone(){
+  const g=new T.Group(); const mat=new T.MeshLambertMaterial({color:0x70707a});
+  if(Math.random()<0.5){ g.add(new T.Mesh(new T.BoxGeometry(1.4,1.8,0.3),mat).translateY(0.9));
+    g.add(new T.Mesh(new T.CylinderGeometry(0.7,0.7,0.3,12,1,false,0,Math.PI),mat).translateY(1.8).rotateX(Math.PI/2)); }
+  else { g.add(new T.Mesh(new T.BoxGeometry(0.3,2,0.3),mat).translateY(1)); g.add(new T.Mesh(new T.BoxGeometry(1.2,0.3,0.3),mat).translateY(1.4)); } // 십자가
+  return g;
+}
+function makeDeadTree(){
+  const g=new T.Group(); const m=new T.MeshLambertMaterial({color:0x241a14});
+  g.add(new T.Mesh(new T.CylinderGeometry(0.3,0.5,6,6),m).translateY(3));
+  for(let i=0;i<5;i++){ const br=new T.Mesh(new T.CylinderGeometry(0.1,0.2,2.5,5),m); const a=i/5*6.28;
+    br.position.set(Math.cos(a)*0.6,4.5+Math.random(),Math.sin(a)*0.6); br.rotation.z=Math.cos(a)*0.9; br.rotation.x=Math.sin(a)*0.9; g.add(br); }
+  return g;
+}
+function makeBatCluster(n){
+  const g=new T.Group();
+  for(let i=0;i<(n||6);i++){ const b=new T.Group();
+    for(const sx of [-1,1]) b.add(new T.Mesh(new T.BoxGeometry(0.5,0.08,0.32),new T.MeshBasicMaterial({color:0x14141a})).translateX(sx*0.32));
+    b.position.set((Math.random()-.5)*5,(Math.random()-.5)*3,(Math.random()-.5)*4); g.add(b); }
+  return g;
+}
+// 박쥐동굴/드라큘라성 내부 터널 (도로 따라 아치 리브)
+function buildGhostTunnel(startS, len, kind){
+  const ribMat=new T.MeshLambertMaterial({color:kind==='cave'?0x2c2c33:0x342a3e});
+  const W=ROAD_W+7;
+  for(let s=startS; s<startS+len; s+=6){
+    const g=new T.Group();
+    const arc=new T.Mesh(new T.TorusGeometry(W/2,0.6,6,18,Math.PI),ribMat); // 반원 아치(local XY)
+    g.add(arc);
+    // 천장 채움(어둡게)
+    if(((s/6)|0)%2===0){ const ceil=new T.Mesh(new T.BoxGeometry(W,0.4,6.2),new T.MeshLambertMaterial({color:kind==='cave'?0x1a1a20:0x221a2c})); ceil.position.y=W/2-0.3; g.add(ceil); }
+    // 내부 횃불(빛나는 점)
+    if(((s/6)|0)%3===0){ for(const sx of [-1,1]){ const tr=new T.Mesh(new T.SphereGeometry(0.4,8,6),new T.MeshBasicMaterial({color:kind==='cave'?0x8fe0ff:0xff7a2a})); tr.position.set(sx*(W/2-0.6),3.5,0); g.add(tr); } }
+    const p=place(g,s,0); g.position.y=groundY(p,0); addS(g);
+  }
+}
+
 function buildScenery(){
   clearScenery();
-  pedestrians.length=0; obstacles.length=0; buildings.length=0; crosswalks.length=0; specialCars.length=0; funRides.length=0; coasters.length=0; flumes.length=0;
+  pedestrians.length=0; obstacles.length=0; buildings.length=0; crosswalks.length=0; specialCars.length=0; funRides.length=0; coasters.length=0; flumes.length=0; ghostFx.length=0;
   const th=THEME;
   // 하늘/안개/조명
   scene.background=new T.Color(th.sky);
@@ -1140,6 +1219,28 @@ function buildScenery(){
     for(let i=0;i<6;i++){ const s=300+i*900+Math.random()*400, lane=[-ROAD_W*0.28,ROAD_W*0.28][i%2], dir=lane>0?1:-1;
       const m=makeFoodTruck(); m.position.copy(sample(s)); addS(m);
       specialCars.push({mesh:m,s,lat:lane,spd:12+Math.random()*6,dir,big:false}); }
+  }
+  if(th.scene==='ghost'){
+    // 약한 가로등(시야 확보)
+    for(let s=50;s<TRACK_LEN-100;s+=44){ const sd=(Math.floor(s/48)%2)?1:-1, lat=sd*(ROAD_W/2+2); const sl=streetlight(); const p=place(sl,s,lat); sl.position.y=groundY(p,lat); sl.rotation.x=0; addS(sl); }
+    // 유령 호텔 + 드라큘라 성 (랜드마크)
+    for(const hs of [TRACK_LEN*0.20, TRACK_LEN*0.60]){ const side=Math.random()<.5?-1:1, lat=side*(ROAD_W/2+26); const h=makeGhostHotel(); const p=place(h,hs,lat); h.position.y=groundY(p,lat); h.rotation.y=-p.h+(lat>0?Math.PI/2:-Math.PI/2); addS(h); }
+    { const lat=-(ROAD_W/2+40); const dc=makeDarkCastle(); const p=place(dc,Math.floor(TRACK_LEN*0.45),lat); dc.position.y=groundY(p,lat); dc.rotation.y=-p.h+Math.PI/2; addS(dc); }
+    // 묘비 + 죽은 나무 (도로변)
+    for(let s=120; s<TRACK_LEN-150; s+=26+Math.random()*22){ const side=Math.random()<.5?-1:1, lat=side*(ROAD_W/2+4+Math.random()*10);
+      const ob=Math.random()<.6?makeTombstone():makeDeadTree(); const p=place(ob,s,lat); ob.position.y=groundY(p,lat); ob.rotation.x=0; ob.rotation.y=Math.random()*6.3; addS(ob); }
+    // 길 건너는/떠다니는 유령
+    for(let s=160; s<TRACK_LEN-200; s+=120+Math.random()*90){
+      const cross=Math.random()<0.5; const gh=makeGhost(0.9+Math.random()*0.5); addS(gh);
+      if(cross) ghostFx.push({mesh:gh,kind:'crossGhost',s,lat:(Math.random()<.5?-1:1)*(ROAD_W/2+6),dir:Math.random()<.5?1:-1,spd:3+Math.random()*2,ph:Math.random()*6});
+      else ghostFx.push({mesh:gh,kind:'floatGhost',s,lat:(Math.random()<.5?-1:1)*(ROAD_W/2+5+Math.random()*8),ph:Math.random()*6});
+    }
+    // 박쥐 떼 (도로 위로 천천히 이동)
+    for(let s=300; s<TRACK_LEN-300; s+=700+Math.random()*500){ const bc=makeBatCluster(8); addS(bc);
+      ghostFx.push({mesh:bc,kind:'bats',s,lat:(Math.random()-.5)*8,spd:18+Math.random()*8,ph:Math.random()*6}); }
+    // 박쥐 동굴 + 드라큘라 성 내부 터널 (도로 위 2구간)
+    buildGhostTunnel(Math.floor(TRACK_LEN*0.30), 280, 'cave');
+    buildGhostTunnel(Math.floor(TRACK_LEN*0.66), 300, 'castle');
   }
   if(th.palms){
     const dens=th.scene==='beach'?.72:.6;
@@ -3098,6 +3199,15 @@ function updateCameos(dt, now){
   // 후룸 통나무 미끄러짐
   for(const fl of flumes){ fl.t=(fl.t+fl.spd*dt)%1; const u=fl.t;
     fl.g.userData.log.position.set(0, 9.2-8.4*u, -6+12*u); fl.g.userData.log.rotation.x=0.52; }
+  // 유령 / 박쥐떼 (유령도시)
+  for(const gf of ghostFx){ gf.ph+=dt;
+    if(gf.kind==='bats'){ const p=place(gf.mesh, gf.s, gf.lat, 7+Math.sin(gf.ph*1.5)*1.6);
+      gf.mesh.children.forEach((b,i)=>{ b.rotation.z=Math.sin(gf.ph*9+i)*0.6; });
+      gf.s+=gf.spd*dt; if(gf.s>TRACK_LEN-120) gf.s=120; }
+    else if(gf.kind==='crossGhost'){ gf.lat+=gf.dir*gf.spd*dt; if(Math.abs(gf.lat)>ROAD_W/2+10) gf.dir*=-1;
+      place(gf.mesh, gf.s, gf.lat, 1.6+Math.sin(gf.ph*2)*0.4); }
+    else { place(gf.mesh, gf.s, gf.lat+Math.sin(gf.ph)*0.6, 2.2+Math.sin(gf.ph*1.6)*0.5); }
+  }
   // 스파이더맨 (도시: 빌딩 사이 거미줄 스윙)
   if(inCity){ spiderman.visible=true; spiderState.t+=dt; const ph=spiderState.t*1.6;
     const p=sample(G.s+45), lat=Math.sin(ph)*16, yArc=11+Math.abs(Math.cos(ph))*6;
