@@ -808,7 +808,9 @@ const obstacles=[];   // 파괴 가능 장애물 (박스/칸막이/덤불)
 const buildings=[];   // 파괴 가능 건물
 const crosswalks=[];  // 신호등 + 횡단보도 + 건너는 사람
 const aircraft=[];
-const funRides=[];    // 회전하는 놀이기구 (대관람차/회전목마 등) {mesh,spd,axis}
+const funRides=[];    // 회전/스윙 놀이기구 (대관람차/회전목마/바이킹) {mesh,spd,axis|swing}
+const coasters=[];    // 롤러코스터 {g,t,spd}
+const flumes=[];      // 후룸라이드 {g,t,spd}
 function makeShadow(r){ const m=new T.Mesh(new T.CircleGeometry(r,18),
   new T.MeshBasicMaterial({color:0x000000,transparent:true,opacity:0.3,depthWrite:false}));
   m.rotation.x=-Math.PI/2; scene.add(m); return m; }
@@ -951,9 +953,72 @@ function makeFoodStand(kind){
   return g;
 }
 
+// ===== 테마파크 이동 세트피스 빌더 =====
+function makeFoodTruck(){
+  const g=new T.Group();
+  const col=new T.Color().setHSL(Math.random(),0.72,0.56);
+  const body=new T.MeshLambertMaterial({color:col});
+  g.add(new T.Mesh(new T.BoxGeometry(2.4,1.8,5.2),body).translateY(1.4));
+  g.add(new T.Mesh(new T.BoxGeometry(2.2,1.2,1.6),body).translateY(1.3).translateZ(2.4));
+  g.add(new T.Mesh(new T.BoxGeometry(0.06,0.95,2.6),new T.MeshBasicMaterial({color:0x222a33})).translateX(1.22).translateY(1.55).translateZ(-0.3));
+  const awn=new T.Mesh(new T.BoxGeometry(0.1,0.16,2.8),new T.MeshLambertMaterial({color:0xffffff})); awn.position.set(1.55,2.05,-0.3); awn.rotation.z=0.5; g.add(awn);
+  g.add(new T.Mesh(new T.BoxGeometry(0.2,0.8,2.2),new T.MeshBasicMaterial({color:0xffe23a})).translateY(2.6).translateZ(-0.2));
+  _simpleWheels(g,.5,[[-1.15,-1.8],[1.15,-1.8],[-1.15,1.8],[1.15,1.8]]);
+  return g;
+}
+function makeCoaster(){
+  const g=new T.Group();
+  const span=ROAD_W+40, peak=15, baseY=5, N=24;
+  const railMat=new T.MeshLambertMaterial({color:0xff4f4f,emissive:0x401010});
+  for(const dz of [-0.7,0.7]){
+    for(let i=0;i<N;i++){
+      const u0=i/N,u1=(i+1)/N;
+      const x0=(u0-0.5)*span,y0=baseY+peak*Math.sin(u0*Math.PI);
+      const x1=(u1-0.5)*span,y1=baseY+peak*Math.sin(u1*Math.PI);
+      const dx=x1-x0,dy=y1-y0,len=Math.hypot(dx,dy);
+      const seg=new T.Mesh(new T.BoxGeometry(len,0.22,0.22),railMat);
+      seg.position.set((x0+x1)/2,(y0+y1)/2,dz); seg.rotation.z=Math.atan2(dy,dx); g.add(seg);
+    }
+  }
+  const poleMat=new T.MeshLambertMaterial({color:0x99a0aa});
+  for(let i=0;i<=N;i+=3){ const u=i/N,x=(u-0.5)*span; if(Math.abs(x)<ROAD_W/2+3)continue;
+    const y=baseY+peak*Math.sin(u*Math.PI); g.add(new T.Mesh(new T.CylinderGeometry(0.3,0.35,y,6),poleMat).translateX(x).translateY(y/2)); }
+  const train=new T.Group();
+  for(let c=0;c<3;c++){ const col=new T.Color().setHSL(c/3,0.85,0.55);
+    train.add(new T.Mesh(new T.BoxGeometry(2.0,1.1,1.4),new T.MeshLambertMaterial({color:col,emissive:col.clone().multiplyScalar(0.35)})).translateX(c*1.5));
+    train.add(new T.Mesh(new T.SphereGeometry(0.28,8,6),new T.MeshLambertMaterial({color:0xffd9a0})).translateX(c*1.5).translateY(0.8)); }
+  g.add(train); g.userData.train=train; g.userData.span=span; g.userData.peak=peak; g.userData.baseY=baseY;
+  return g;
+}
+function makeVikingShip(){
+  const g=new T.Group();
+  const fr=new T.MeshLambertMaterial({color:0x9a7a4a});
+  for(const sx of [-1,1]){ for(const dz of [0,3.5]){ const leg=new T.Mesh(new T.CylinderGeometry(0.3,0.45,16,6),fr); leg.position.set(sx*5,8,dz); leg.rotation.z=sx*0.34; g.add(leg);} }
+  const pivot=new T.Group(); pivot.position.set(0,15,1.75); g.add(pivot);
+  pivot.add(new T.Mesh(new T.CylinderGeometry(0.22,0.22,13,6),new T.MeshLambertMaterial({color:0x777f88})).translateY(-6.5));
+  const boat=new T.Group(); boat.position.y=-13;
+  boat.add(new T.Mesh(new T.BoxGeometry(7,1.7,2.4),new T.MeshLambertMaterial({color:0x8a3a1a})).translateY(0.1));
+  const head=new T.Mesh(new T.ConeGeometry(0.8,2,6),new T.MeshLambertMaterial({color:0xc8a030})); head.position.set(3.9,0.7,0); head.rotation.z=-Math.PI/2; boat.add(head);
+  for(let i=0;i<5;i++) boat.add(new T.Mesh(new T.SphereGeometry(0.3,8,6),new T.MeshLambertMaterial({color:new T.Color().setHSL(i/5,0.6,0.62)})).translateX(-2.5+i*1.2).translateY(1.1));
+  pivot.add(boat); g.userData.pivot=pivot; return g;
+}
+function makeFlume(){
+  const g=new T.Group();
+  const water=new T.MeshLambertMaterial({color:0x3aa0e0,transparent:true,opacity:0.85,emissive:0x103040});
+  const wood=new T.MeshLambertMaterial({color:0x7a5a3a});
+  const slide=new T.Mesh(new T.BoxGeometry(2.6,0.4,17),water); slide.position.set(0,5,0); slide.rotation.x=0.52; g.add(slide);
+  g.add(new T.Mesh(new T.BoxGeometry(0.5,11,0.5),wood).translateZ(-6.5).translateY(5.5));
+  g.add(new T.Mesh(new T.BoxGeometry(0.5,4,0.5),wood).translateZ(6).translateY(2));
+  g.add(new T.Mesh(new T.CylinderGeometry(4,4,0.5,16),water).translateZ(9.5).translateY(0.3));
+  const log=new T.Group();
+  log.add(new T.Mesh(new T.CylinderGeometry(0.7,0.7,2.4,8),wood).rotateZ(Math.PI/2));
+  for(let i=0;i<2;i++) log.add(new T.Mesh(new T.SphereGeometry(0.3,8,6),new T.MeshLambertMaterial({color:0xffd9a0})).translateX(-0.5+i).translateY(0.55));
+  g.add(log); g.userData.log=log; return g;
+}
+
 function buildScenery(){
   clearScenery();
-  pedestrians.length=0; obstacles.length=0; buildings.length=0; crosswalks.length=0; specialCars.length=0; funRides.length=0;
+  pedestrians.length=0; obstacles.length=0; buildings.length=0; crosswalks.length=0; specialCars.length=0; funRides.length=0; coasters.length=0; flumes.length=0;
   const th=THEME;
   // 하늘/안개/조명
   scene.background=new T.Color(th.sky);
@@ -1054,6 +1119,27 @@ function buildScenery(){
     // 가로등 (밤 시야)
     for(let s=40;s<TRACK_LEN-100;s+=30){ const sd=(Math.floor(s/36)%2)?1:-1, lat=sd*(ROAD_W/2+2);
       const sl=streetlight(); const p=place(sl,s,lat); sl.position.y=groundY(p,lat); sl.rotation.x=0; addS(sl); }
+    // 머리 위로 지나가는 롤러코스터 (도로 가로지르는 아치 + 달리는 열차)
+    for(let s=700; s<TRACK_LEN-500; s+=1500+Math.random()*700){
+      const co=makeCoaster(); const p=place(co,s,0); co.position.y=groundY(p,0); co.rotation.y=-p.h+Math.PI/2; addS(co);
+      coasters.push({g:co,t:Math.random(),spd:0.16+Math.random()*0.1});
+    }
+    // 좌우로 흔들리는 바이킹 배
+    for(let s=420; s<TRACK_LEN-400; s+=1300+Math.random()*600){
+      const side=Math.random()<.5?-1:1, lat=side*(ROAD_W/2+20+Math.random()*8);
+      const vk=makeVikingShip(); const p=place(vk,s,lat); vk.position.y=groundY(p,lat); vk.rotation.y=-p.h+(lat>0?Math.PI/2:-Math.PI/2); addS(vk);
+      funRides.push({mesh:vk.userData.pivot,swing:0.7,spd:1.2+Math.random()*0.3});
+    }
+    // 후룸 라이드 (물 미끄럼틀 + 통나무)
+    for(let s=900; s<TRACK_LEN-500; s+=1700+Math.random()*700){
+      const side=Math.random()<.5?-1:1, lat=side*(ROAD_W/2+16+Math.random()*8);
+      const fl=makeFlume(); const p=place(fl,s,lat); fl.position.y=groundY(p,lat); fl.rotation.y=-p.h+(lat>0?Math.PI/2:-Math.PI/2); addS(fl);
+      flumes.push({g:fl,t:Math.random(),spd:0.4+Math.random()*0.2});
+    }
+    // 푸드카 트래픽 (찻길 위, 색색)
+    for(let i=0;i<6;i++){ const s=300+i*900+Math.random()*400, lane=[-ROAD_W*0.28,ROAD_W*0.28][i%2], dir=lane>0?1:-1;
+      const m=makeFoodTruck(); m.position.copy(sample(s)); addS(m);
+      specialCars.push({mesh:m,s,lat:lane,spd:12+Math.random()*6,dir,big:false}); }
   }
   if(th.palms){
     const dens=th.scene==='beach'?.72:.6;
@@ -2999,8 +3085,19 @@ function updateGang(dt, now){
 function updateCameos(dt, now){
   const racing=(G.mode==='race'||G.mode==='replay');
   const inCity=racing && THEME.scene==='city';
-  // 놀이기구 회전 (대관람차/회전목마)
-  for(const fr of funRides){ if(fr.axis==='z') fr.mesh.rotation.z+=fr.spd*dt; else fr.mesh.rotation.y+=fr.spd*dt; }
+  // 놀이기구: 회전(관람차/회전목마) + 스윙(바이킹)
+  for(const fr of funRides){
+    if(fr.swing!==undefined){ fr.mesh.rotation.z=Math.sin(now*0.001*fr.spd)*fr.swing; }
+    else if(fr.axis==='z') fr.mesh.rotation.z+=fr.spd*dt;
+    else fr.mesh.rotation.y+=fr.spd*dt;
+  }
+  // 롤러코스터 열차 (아치 따라 머리 위로)
+  for(const co of coasters){ co.t=(co.t+co.spd*dt)%1; const ud=co.g.userData,u=co.t;
+    const y=ud.baseY+ud.peak*Math.sin(u*Math.PI), y2=ud.baseY+ud.peak*Math.sin(Math.min(1,u+0.01)*Math.PI);
+    ud.train.position.set((u-0.5)*ud.span,y,0); ud.train.rotation.z=Math.atan2(y2-y,0.01*ud.span); }
+  // 후룸 통나무 미끄러짐
+  for(const fl of flumes){ fl.t=(fl.t+fl.spd*dt)%1; const u=fl.t;
+    fl.g.userData.log.position.set(0, 9.2-8.4*u, -6+12*u); fl.g.userData.log.rotation.x=0.52; }
   // 스파이더맨 (도시: 빌딩 사이 거미줄 스윙)
   if(inCity){ spiderman.visible=true; spiderState.t+=dt; const ph=spiderState.t*1.6;
     const p=sample(G.s+45), lat=Math.sin(ph)*16, yArc=11+Math.abs(Math.cos(ph))*6;
